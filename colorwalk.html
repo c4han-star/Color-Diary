@@ -6,7 +6,7 @@
   <title>Colorwalk — Cover Generator</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400&family=EB+Garamond:wght@400;500&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Cormorant:wght@300;400&display=swap" rel="stylesheet" />
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -14,7 +14,7 @@
   <script src="https://unpkg.com/node-vibrant@3.1.6/dist/vibrant.min.js"></script>
   <style>
     * { box-sizing: border-box; }
-    body { margin: 0; font-family: 'EB Garamond', Georgia, serif; -webkit-font-smoothing: antialiased; }
+    body { margin: 0; font-family: 'Cormorant Garamond', Georgia, serif; -webkit-font-smoothing: antialiased; }
 
     input[type='range'] {
       -webkit-appearance: none; appearance: none;
@@ -157,8 +157,8 @@
         const maxTextW    = CANVAS_W * 0.76;
         const lineH       = fontSize * 1.22;
 
-        ctx.font = `500 ${fontSize}px "Playfair Display", Georgia, serif`;
-        if ('letterSpacing' in ctx) ctx.letterSpacing = '1px';
+        ctx.font = `300 ${fontSize}px "Cormorant Garamond", Georgia, serif`;
+        if ('letterSpacing' in ctx) ctx.letterSpacing = '3px';
 
         const titleLines  = measureLines(ctx, title || ' ', maxTextW);
         const titleBottom = drawWrappedText(ctx, titleLines, CANVAS_W / 2, textCenterY, lineH);
@@ -174,8 +174,8 @@
 
         // Date
         const dateSz = Math.round(Math.max(18, fontSize * 0.26));
-        ctx.font = `400 ${dateSz}px "Playfair Display", Georgia, serif`;
-        if ('letterSpacing' in ctx) ctx.letterSpacing = '5px';
+        ctx.font = `300 ${dateSz}px "Cormorant", Georgia, serif`;
+        if ('letterSpacing' in ctx) ctx.letterSpacing = '8px';
         ctx.globalAlpha = 0.75;
         ctx.fillText(today, CANVAS_W / 2, ruleY + 36);
         ctx.globalAlpha = 1;
@@ -260,7 +260,7 @@
                 <input
                   type="text" value={title} onChange={(e) => setTitle(e.target.value)}
                   className="w-full border-b border-stone-200 focus:border-stone-600 outline-none py-1.5 text-stone-800 text-lg bg-transparent transition-colors"
-                  style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
+                  style={{ fontFamily: "'Cormorant Garamond', Georgia, serif" }}
                   placeholder="Enter a title…"
                 />
               </Section>
