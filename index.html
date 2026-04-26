@@ -21,6 +21,8 @@
     input[type='color'] { -webkit-appearance: none; border: none; padding: 0; cursor: pointer; }
     input[type='color']::-webkit-color-swatch-wrapper { padding: 0; }
     input[type='color']::-webkit-color-swatch { border: 1px solid #d6d3d1; border-radius: 0; }
+    .no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
   </style>
 </head>
 <body>
@@ -147,7 +149,7 @@
 
       const canvasRef = useRef(null), fileRef = useRef(null), wrapRef = useRef(null);
       const ps = useRef({ on: false, sx: 0, sy: 0, spx: 0, spy: 0, moved: false, inImg: false });
-      const PW = 380, PH = Math.round(PW / CANVAS_W * CANVAS_H);
+      const PW = 460, PH = Math.round(PW / CANVAS_W * CANVAS_H);
 
       useEffect(() => { document.fonts.ready.then(() => setFontsReady(true)); }, []);
 
@@ -263,14 +265,14 @@
 
       return (
         <div className="min-h-screen bg-stone-50" style={{ fontFamily: "'Courier Prime','Courier New',monospace" }}>
-          <header className="border-b border-stone-200 px-10 py-4">
-            <div className="max-w-5xl mx-auto flex items-center gap-4">
-              <img src="logo.png" alt="Color Diary" style={{height:'68px',width:'auto'}} />
-              <span className="text-xs text-stone-400">moments in color</span>
+          <header className="border-b border-stone-200 px-12 py-5">
+            <div className="max-w-6xl mx-auto flex items-center gap-5">
+              <img src="logo.png" alt="Color Diary" style={{height:'84px',width:'auto'}} />
+              <span className="text-sm text-stone-400">moments in color</span>
             </div>
           </header>
 
-          <main className="max-w-5xl mx-auto px-10 py-14 flex gap-14 items-start">
+          <main className="max-w-6xl mx-auto px-12 py-12 flex gap-12 items-start">
             <div className="flex-shrink-0 flex flex-col items-center gap-3">
               <div ref={wrapRef}
                 className={`relative overflow-hidden select-none ${image ? 'cursor-grab' : 'cursor-pointer'} ${dropHover ? 'shadow-lg ring-1 ring-stone-400' : 'shadow-sm'}`}
@@ -299,7 +301,7 @@
               </p>
             </div>
 
-            <div className="flex-1 flex flex-col gap-9 pt-1">
+            <div className="no-scrollbar flex-1 flex flex-col gap-8 overflow-y-auto" style={{height: PH}}>
 
               <Section label="Photo">
                 <button onClick={() => fileRef.current?.click()}
