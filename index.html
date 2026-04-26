@@ -220,10 +220,8 @@
       const [dropHover, setDropHover] = useState(false);
       const [fontsReady, setFontsReady] = useState(false);
 
-      const [dragReady, setDragReady] = useState(false);
       const [activeTab, setActiveTab] = useState('photo');
       const [savedImgUrl, setSavedImgUrl] = useState(null);
-      const [canvasScale, setCanvasScale] = useState(1);
 
       const canvasRef = useRef(null), fileRef = useRef(null), wrapRef = useRef(null);
       const ps = useRef({ on: false, sx: 0, sy: 0, spx: 0, spy: 0, moved: false, inImg: false, dragActive: false });
@@ -242,16 +240,9 @@
       const isMobile = viewW < 640;
       // Fixed dark workspace height: 57% of usable viewport (below ~54px header)
       const darkAreaH = isMobile ? Math.max(220, Math.round((viewH - 54) * 0.57)) : 0;
-      // Default card occupies 75% of dark area height, centered → visible dark border
-      const basePW = isMobile
-        ? Math.round(darkAreaH * 0.75 * CANVAS_W / CANVAS_H)
-        : 400;
-      // Max card: nearly fills dark area (10px margin each side)
-      const maxPW = isMobile
-        ? Math.min(viewW - 16, Math.round((darkAreaH - 20) * CANVAS_W / CANVAS_H))
-        : 400;
+      // Card occupies 83% of dark area height — slightly larger default, visible dark border
       const PW = isMobile
-        ? Math.max(Math.round(basePW * 0.55), Math.min(maxPW, Math.round(basePW * canvasScale)))
+        ? Math.round(darkAreaH * 0.83 * CANVAS_W / CANVAS_H)
         : 400;
       const PH = Math.round(PW / CANVAS_W * CANVAS_H);
 
@@ -317,7 +308,7 @@
         const url = URL.createObjectURL(file);
 
         const afterLoad = async (el, type) => {
-          setImage(el); setSourceType(type); setPan({ x: 0, y: 0 }); setCanvasScale(1);
+          setImage(el); setSourceType(type); setPan({ x: 0, y: 0 });
           clearTimeout(hintTimer.current);
           setShowPanHint(true);
           hintTimer.current = setTimeout(() => setShowPanHint(false), 2500);
@@ -433,6 +424,22 @@
         setTimeout(() => recorder.stop(), durationSec * 1000);
       }, [image, sourceType, isExporting, title]);
 
+      // Clamp pan so photo never exposes empty space in its container
+      const clampPan = useCallback((nx, ny) => {
+        if (!image) return { x: nx, y: ny };
+        const botH = CANVAS_H - Math.round(CANVAS_H * split);
+        const ia = image.width / image.height, ta = CANVAS_W / botH;
+        if (ia > ta) {
+          const sw = image.height * ta;
+          const max = (image.width - sw) / 2;
+          return { x: Math.max(-max, Math.min(max, nx)), y: 0 };
+        } else {
+          const sh = image.width / ta;
+          const max = (image.height - sh) / 2;
+          return { x: 0, y: Math.max(-max, Math.min(max, ny)) };
+        }
+      }, [image, split]);
+
       const onPointerDown = (e) => {
         if (e.button !== 0 && e.pointerType === 'mouse') return;
         touches.current[e.pointerId] = { x: e.clientX, y: e.clientY };
@@ -440,7 +447,6 @@
 
         if (n === 1) {
           ps.current = { sx: e.clientX, sy: e.clientY, spx: pan.x, spy: pan.y, moved: false, dragActive: false };
-          // Desktop mouse: drag in photo area pans the photo
           if (e.pointerType === 'mouse' && image) {
             const rect = wrapRef.current.getBoundingClientRect();
             if ((e.clientY - rect.top) / rect.height >= split) {
@@ -449,15 +455,11 @@
             }
           }
         } else if (n === 2) {
-          // Two touches: pinch-scale + two-finger photo pan
-          ps.current = { moved: true }; // prevent tap-to-upload
+          ps.current = { moved: true };
           const pts = Object.values(touches.current);
-          const midX = (pts[0].x + pts[1].x) / 2;
-          const midY = (pts[0].y + pts[1].y) / 2;
           lastPinch.current = {
-            dist: Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y),
-            startScale: canvasScale,
-            prevMidX: midX, prevMidY: midY,
+            prevMidX: (pts[0].x + pts[1].x) / 2,
+            prevMidY: (pts[0].y + pts[1].y) / 2,
           };
         }
       };
@@ -467,26 +469,17 @@
         touches.current[e.pointerId] = { x: e.clientX, y: e.clientY };
         const n = Object.keys(touches.current).length;
 
-        if (n === 2 && lastPinch.current) {
+        if (n === 2 && lastPinch.current && image) {
           const pts = Object.values(touches.current);
-          const newDist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
           const newMidX = (pts[0].x + pts[1].x) / 2;
           const newMidY = (pts[0].y + pts[1].y) / 2;
-
-          // Pinch: scale the canvas card
-          setCanvasScale(Math.max(0.55, Math.min(maxPW / basePW,
-            lastPinch.current.startScale * newDist / lastPinch.current.dist)));
-
-          // Two-finger drag: pan the photo inside the card
-          if (image) {
-            const dmx = newMidX - lastPinch.current.prevMidX;
-            const dmy = newMidY - lastPinch.current.prevMidY;
-            const botH = CANVAS_H - Math.round(CANVAS_H * split);
-            const botH_p = PH - Math.round(PH * split);
-            const ia = image.width / image.height, ta = CANVAS_W / botH;
-            const pxScale = ia > ta ? image.height / botH_p : image.width / PW;
-            setPan(prev => ({ x: prev.x - dmx * pxScale, y: prev.y - dmy * pxScale }));
-          }
+          const dmx = newMidX - lastPinch.current.prevMidX;
+          const dmy = newMidY - lastPinch.current.prevMidY;
+          const botH = CANVAS_H - Math.round(CANVAS_H * split);
+          const botH_p = PH - Math.round(PH * split);
+          const ia = image.width / image.height, ta = CANVAS_W / botH;
+          const pxScale = ia > ta ? image.height / botH_p : image.width / PW;
+          setPan(prev => clampPan(prev.x - dmx * pxScale, prev.y - dmy * pxScale));
           lastPinch.current.prevMidX = newMidX;
           lastPinch.current.prevMidY = newMidY;
           return;
@@ -496,13 +489,12 @@
         const dx = e.clientX - ps.current.sx, dy = e.clientY - ps.current.sy;
         if (Math.hypot(dx, dy) > 8) ps.current.moved = true;
 
-        // Desktop mouse drag to pan photo
         if (e.pointerType === 'mouse' && ps.current.dragActive && image) {
           const botH = CANVAS_H - Math.round(CANVAS_H * split);
           const botH_p = PH - Math.round(PH * split);
           const ia = image.width / image.height, ta = CANVAS_W / botH;
-          const baseScale = ia > ta ? image.height / botH_p : image.width / PW;
-          setPan({ x: ps.current.spx - dx * baseScale, y: ps.current.spy - dy * baseScale });
+          const pxScale = ia > ta ? image.height / botH_p : image.width / PW;
+          setPan(clampPan(ps.current.spx - dx * pxScale, ps.current.spy - dy * pxScale));
         }
       };
 
@@ -654,10 +646,6 @@
                         {t.dragHint}
                       </div>
                     </div>
-                  )}
-                  {dragReady && (
-                    <div className="absolute inset-0 pointer-events-none"
-                      style={{ boxShadow: 'inset 0 0 0 3px rgba(255,255,255,0.6)' }} />
                   )}
                   {dropHover && (
                     <div className="absolute inset-0 flex items-center justify-center bg-stone-900/20">
