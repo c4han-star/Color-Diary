@@ -29,15 +29,16 @@
   <script type="text/babel">
     const { useState, useRef, useEffect, useCallback } = React;
     const CANVAS_W = 1000, CANVAS_H = 1400;
+    const AUTO_DATE = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }).toUpperCase();
 
     function hexToRgb(hex) {
-      const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
-      return { r, g, b };
+      return { r: parseInt(hex.slice(1,3),16), g: parseInt(hex.slice(3,5),16), b: parseInt(hex.slice(5,7),16) };
     }
 
-    function shiftColor(hex, amount) {
+    function shiftColor(hex, n) {
       const { r, g, b } = hexToRgb(hex);
-      return `rgb(${Math.min(255,Math.max(0,r+amount))},${Math.min(255,Math.max(0,g+amount))},${Math.min(255,Math.max(0,b+amount))})`;
+      const c = v => Math.min(255, Math.max(0, v + n));
+      return `rgb(${c(r)},${c(g)},${c(b)})`;
     }
 
     function getTextColor(hex) {
@@ -47,52 +48,105 @@
       } catch { return '#1c1917'; }
     }
 
-    function measureLines(ctx, text, maxWidth) {
+    function hslToHex(h, s, l) {
+      s /= 100; l /= 100;
+      const a = s * Math.min(l, 1 - l);
+      const f = n => {
+        const k = (n + h / 30) % 12;
+        return Math.round(255 * (l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1))).toString(16).padStart(2, '0');
+      };
+      return `#${f(0)}${f(8)}${f(4)}`;
+    }
+
+    function randomNiceColor() {
+      return hslToHex(Math.random() * 360, 22 + Math.random() * 28, 52 + Math.random() * 22);
+    }
+
+    function measureLines(ctx, text, maxW) {
       if (!text.trim()) return [];
-      const words = text.split(' '), lines = []; let line = '';
-      for (const word of words) {
-        const c = line ? line+' '+word : word;
-        if (ctx.measureText(c).width > maxWidth && line) { lines.push(line); line = word; } else line = c;
+      const words = text.split(' '); let line = '', lines = [];
+      for (const w of words) {
+        const c = line ? line + ' ' + w : w;
+        if (ctx.measureText(c).width > maxW && line) { lines.push(line); line = w; } else line = c;
       }
       if (line) lines.push(line);
       return lines;
     }
 
     function drawLines(ctx, lines, x, cy, lh) {
-      const startY = cy - lines.length*lh/2 + lh/2;
-      lines.forEach((l,i) => ctx.fillText(l, x, startY+i*lh));
-      return startY + lines.length*lh - lh/2;
+      const sy = cy - lines.length * lh / 2 + lh / 2;
+      lines.forEach((l, i) => ctx.fillText(l, x, sy + i * lh));
+      return sy + lines.length * lh - lh / 2;
     }
 
-    function addGrainToRegion(ctx, x, y, w, h, intensity) {
-      const imageData = ctx.getImageData(x, y, w, h);
-      const d = imageData.data;
-      for (let i = 0; i < d.length; i += 4) {
-        const noise = (Math.random() - 0.5) * intensity;
-        d[i]   = Math.min(255, Math.max(0, d[i]   + noise));
-        d[i+1] = Math.min(255, Math.max(0, d[i+1] + noise));
-        d[i+2] = Math.min(255, Math.max(0, d[i+2] + noise));
+    function addGrain(ctx, x, y, w, h, intensity) {
+      const d = ctx.getImageData(x, y, w, h), px = d.data;
+      for (let i = 0; i < px.length; i += 4) {
+        const n = (Math.random() - 0.5) * intensity;
+        px[i]   = Math.min(255, Math.max(0, px[i]   + n));
+        px[i+1] = Math.min(255, Math.max(0, px[i+1] + n));
+        px[i+2] = Math.min(255, Math.max(0, px[i+2] + n));
       }
-      ctx.putImageData(imageData, x, y);
+      ctx.putImageData(d, x, y);
+    }
+
+    function drawGradBlock(ctx, color, x, y, w, h, grain) {
+      const g = ctx.createLinearGradient(x, y, x, y + h);
+      g.addColorStop(0,    shiftColor(color,  24));
+      g.addColorStop(0.52, color);
+      g.addColorStop(1,    shiftColor(color, -22));
+      ctx.fillStyle = g;
+      ctx.fillRect(x, y, w, h);
+      addGrain(ctx, x, y, w, h, grain);
+    }
+
+    function ColorPicker({ color, onChange, label }) {
+      return (
+        <div className="flex items-center gap-3">
+          <div className="relative w-10 h-7 border border-stone-300 overflow-hidden flex-shrink-0">
+            <input type="color" value={color} onChange={e => onChange(e.target.value)}
+              className="absolute -inset-1 opacity-0 cursor-pointer"
+              style={{ width: 'calc(100% + 8px)', height: 'calc(100% + 8px)' }} />
+            <div className="absolute inset-0 pointer-events-none" style={{ background: color }} />
+          </div>
+          <span className="text-xs text-stone-600 font-mono tracking-widest">{color.toUpperCase()}</span>
+          {label && <span className="text-xs text-stone-400">{label}</span>}
+          <button onClick={() => onChange(randomNiceColor())}
+            className="ml-auto text-xs text-stone-400 hover:text-stone-800 transition-colors tracking-widest">
+            ↻ RANDOM
+          </button>
+        </div>
+      );
     }
 
     function Section({ label, value, children }) {
-      return <div><div className="flex items-baseline justify-between mb-2.5">
-        <span className="text-xs text-stone-400 uppercase" style={{letterSpacing:'0.14em'}}>{label}</span>
-        {value && <span className="text-xs text-stone-400">{value}</span>}
-      </div>{children}</div>;
+      return (
+        <div>
+          <div className="flex items-baseline justify-between mb-2.5">
+            <span className="text-xs text-stone-400 uppercase" style={{ letterSpacing: '0.14em' }}>{label}</span>
+            {value && <span className="text-xs text-stone-400">{value}</span>}
+          </div>
+          {children}
+        </div>
+      );
     }
 
     function App() {
-      const [image, setImage] = useState(null);
-      const [title, setTitle] = useState('A WALK THROUGH COLOR');
-      const [split, setSplit] = useState(0.44);
-      const [fontSize, setFontSize] = useState(26);
-      const [bgColor, setBgColor] = useState('#c9bba8');
-      const [drag, setDrag] = useState(false);
+      const [image, setImage]         = useState(null);
+      const [title, setTitle]         = useState('A WALK THROUGH COLOR');
+      const [split, setSplit]         = useState(0.44);
+      const [fontSize, setFontSize]   = useState(26);
+      const [bgColor, setBgColor]     = useState('#c9bba8');
+      const [botColor, setBotColor]   = useState('#7a8c8d');
+      const [botMode, setBotMode]     = useState('photo'); // 'photo' | 'color'
+      const [pan, setPan]             = useState({ x: 0, y: 0 });
+      const [dateText, setDateText]   = useState(AUTO_DATE);
+      const [dropHover, setDropHover] = useState(false);
       const [fontsReady, setFontsReady] = useState(false);
-      const canvasRef = useRef(null), fileRef = useRef(null);
-      const today = new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'}).toUpperCase();
+
+      const canvasRef = useRef(null), fileRef = useRef(null), wrapRef = useRef(null);
+      const ps = useRef({ on: false, sx: 0, sy: 0, spx: 0, spy: 0, moved: false, inImg: false });
+      const PW = 380, PH = Math.round(PW / CANVAS_W * CANVAS_H);
 
       useEffect(() => { document.fonts.ready.then(() => setFontsReady(true)); }, []);
 
@@ -102,88 +156,109 @@
         const topH = Math.round(CANVAS_H * split), botH = CANVAS_H - topH;
         ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
 
-        // Gradient top section
-        const grad = ctx.createLinearGradient(0, 0, 0, topH);
-        grad.addColorStop(0, shiftColor(bgColor, 28));
-        grad.addColorStop(0.55, bgColor);
-        grad.addColorStop(1, shiftColor(bgColor, -18));
-        ctx.fillStyle = grad;
-        ctx.fillRect(0, 0, CANVAS_W, topH);
+        drawGradBlock(ctx, bgColor, 0, 0, CANVAS_W, topH, 38);
 
-        // Grain / noise texture
-        addGrainToRegion(ctx, 0, 0, CANVAS_W, topH, 38);
-
-        // Bottom: image or placeholder
-        if (image) {
-          const ia = image.width/image.height, ta = CANVAS_W/botH;
-          let sx,sy,sw,sh;
-          if (ia > ta) { sh=image.height; sw=sh*ta; sx=(image.width-sw)/2; sy=0; }
-          else { sw=image.width; sh=sw/ta; sx=0; sy=(image.height-sh)/2; }
+        if (botMode === 'photo' && image) {
+          const ia = image.width / image.height, ta = CANVAS_W / botH;
+          let sx, sy, sw, sh;
+          if (ia > ta) {
+            sh = image.height; sw = sh * ta;
+            sx = Math.max(0, Math.min(image.width - sw, (image.width - sw) / 2 + pan.x));
+            sy = 0;
+          } else {
+            sw = image.width; sh = sw / ta;
+            sx = 0;
+            sy = Math.max(0, Math.min(image.height - sh, (image.height - sh) / 2 + pan.y));
+          }
           ctx.drawImage(image, sx, sy, sw, sh, 0, topH, CANVAS_W, botH);
         } else {
-          ctx.fillStyle='#b8afa6'; ctx.fillRect(0,topH,CANVAS_W,botH);
-          ctx.fillStyle='rgba(250,249,247,0.3)'; ctx.textAlign='center'; ctx.textBaseline='middle';
-          ctx.font='24px "Courier Prime","Courier New",monospace';
-          ctx.fillText('UPLOAD A PHOTO', CANVAS_W/2, topH+botH/2);
+          const c = botMode === 'color' ? botColor : '#b8afa6';
+          drawGradBlock(ctx, c, 0, topH, CANVAS_W, botH, 30);
+          if (botMode === 'photo' && !image) {
+            ctx.fillStyle = 'rgba(250,249,247,0.3)';
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.font = '24px "Courier Prime","Courier New",monospace';
+            ctx.fillText('UPLOAD A PHOTO', CANVAS_W / 2, topH + botH / 2);
+          }
         }
 
-        // Text overlay
         const tc = getTextColor(bgColor);
-        ctx.fillStyle = tc;
-        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-
-        const textCenterY = topH * 0.46;
-        const lineH = fontSize * 1.5;
-
+        ctx.fillStyle = tc; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         ctx.font = `400 ${fontSize}px "Courier Prime","Courier New",monospace`;
         if ('letterSpacing' in ctx) ctx.letterSpacing = '6px';
-
         const lines = measureLines(ctx, title || ' ', CANVAS_W * 0.7);
-        const bottom = drawLines(ctx, lines, CANVAS_W/2, textCenterY, lineH);
+        const btm = drawLines(ctx, lines, CANVAS_W / 2, topH * 0.46, fontSize * 1.5);
 
-        // Rule
-        const ry = bottom + 32;
+        const ry = btm + 32;
         ctx.strokeStyle = tc; ctx.globalAlpha = 0.3; ctx.lineWidth = 0.5;
-        ctx.beginPath(); ctx.moveTo(CANVAS_W/2-40, ry); ctx.lineTo(CANVAS_W/2+40, ry); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(CANVAS_W/2 - 40, ry); ctx.lineTo(CANVAS_W/2 + 40, ry); ctx.stroke();
         ctx.globalAlpha = 1;
 
-        // Date
         ctx.font = `400 ${Math.max(14, Math.round(fontSize * 0.7))}px "Courier Prime","Courier New",monospace`;
         if ('letterSpacing' in ctx) ctx.letterSpacing = '4px';
         ctx.globalAlpha = 0.55;
-        ctx.fillText(today, CANVAS_W/2, ry + 28);
+        ctx.fillText(dateText || AUTO_DATE, CANVAS_W / 2, ry + 28);
         ctx.globalAlpha = 1;
         if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
-      }, [image, bgColor, title, split, fontSize, today]);
+      }, [image, bgColor, botColor, botMode, title, split, fontSize, pan, dateText]);
 
       useEffect(() => { draw(); }, [draw, fontsReady]);
 
       const load = useCallback(async (file) => {
-        if (!file||!file.type.startsWith('image/')) return;
+        if (!file || !file.type.startsWith('image/')) return;
         const url = URL.createObjectURL(file);
         const img = new Image();
         img.onload = async () => {
-          setImage(img);
+          setImage(img); setPan({ x: 0, y: 0 }); setBotMode('photo');
           try {
             const p = await Vibrant.from(url).getPalette();
-            const s = p.Vibrant??p.LightVibrant??p.Muted??p.DarkVibrant;
-            if (s) setBgColor(s.hex);
-          } catch(e) {}
+            const v = p.Vibrant ?? p.LightVibrant ?? p.Muted;
+            if (v) setBgColor(v.hex);
+            const d = p.DarkVibrant ?? p.DarkMuted ?? p.Muted;
+            if (d) setBotColor(d.hex);
+          } catch (e) {}
         };
         img.src = url;
       }, []);
 
+      const onPointerDown = (e) => {
+        if (e.button !== 0) return;
+        const rect = wrapRef.current.getBoundingClientRect();
+        const yRel = (e.clientY - rect.top) / PH;
+        const inImg = yRel >= split && !!image && botMode === 'photo';
+        ps.current = { on: true, sx: e.clientX, sy: e.clientY, spx: pan.x, spy: pan.y, moved: false, inImg };
+        if (inImg) e.preventDefault();
+      };
+
+      const onPointerMove = (e) => {
+        if (!ps.current.on) return;
+        const dx = e.clientX - ps.current.sx, dy = e.clientY - ps.current.sy;
+        if (Math.hypot(dx, dy) > 4) ps.current.moved = true;
+        if (!ps.current.moved || !ps.current.inImg) return;
+        const botH = CANVAS_H - Math.round(CANVAS_H * split);
+        const botH_p = PH - Math.round(PH * split);
+        const ia = image.width / image.height, ta = CANVAS_W / botH;
+        const scale = ia > ta ? image.height / botH_p : image.width / PW;
+        setPan({ x: ps.current.spx - dx * scale, y: ps.current.spy - dy * scale });
+      };
+
+      const onPointerUp = () => {
+        if (!ps.current.on) return;
+        ps.current.on = false;
+        if (!ps.current.moved) fileRef.current?.click();
+      };
+
       const exportPng = useCallback(() => {
-        const canvas = canvasRef.current; if (!canvas) return;
         const a = document.createElement('a');
-        a.download = (title||'cover').trim().replace(/\s+/g,'-').toLowerCase()+'.png';
-        a.href = canvas.toDataURL('image/png'); a.click();
+        a.download = (title || 'cover').trim().replace(/\s+/g, '-').toLowerCase() + '.png';
+        a.href = canvasRef.current.toDataURL('image/png');
+        a.click();
       }, [title]);
 
-      const PW = 380, PH = Math.round(PW/CANVAS_W*CANVAS_H);
+      const canPan = !!image && botMode === 'photo';
 
       return (
-        <div className="min-h-screen bg-stone-50" style={{fontFamily:"'Courier Prime','Courier New',monospace"}}>
+        <div className="min-h-screen bg-stone-50" style={{ fontFamily: "'Courier Prime','Courier New',monospace" }}>
           <header className="border-b border-stone-200 px-10 py-5">
             <div className="max-w-5xl mx-auto flex items-baseline gap-4">
               <span className="text-sm text-stone-800 tracking-widest">COLORWALK</span>
@@ -193,60 +268,92 @@
 
           <main className="max-w-5xl mx-auto px-10 py-14 flex gap-14 items-start">
             <div className="flex-shrink-0 flex flex-col items-center gap-3">
-              <div className={`relative overflow-hidden cursor-pointer ${drag?'shadow-lg ring-1 ring-stone-400':'shadow-sm'}`}
-                style={{width:PW,height:PH,background:'#e7e3de'}}
-                onClick={()=>fileRef.current?.click()}
-                onDrop={e=>{e.preventDefault();setDrag(false);load(e.dataTransfer.files[0]);}}
-                onDragOver={e=>{e.preventDefault();setDrag(true);}} onDragLeave={()=>setDrag(false)}>
-                <canvas ref={canvasRef} width={CANVAS_W} height={CANVAS_H} style={{width:'100%',height:'100%',display:'block'}}/>
-                {drag && <div className="absolute inset-0 flex items-center justify-center bg-stone-900/20">
-                  <span className="text-white text-xs tracking-widest">DROP IMAGE</span></div>}
+              <div ref={wrapRef}
+                className={`relative overflow-hidden select-none ${canPan ? 'cursor-grab' : 'cursor-pointer'} ${dropHover ? 'shadow-lg ring-1 ring-stone-400' : 'shadow-sm'}`}
+                style={{ width: PW, height: PH, background: '#e7e3de' }}
+                onPointerDown={onPointerDown}
+                onPointerMove={onPointerMove}
+                onPointerUp={onPointerUp}
+                onPointerLeave={() => { ps.current.on = false; }}
+                onDrop={e => { e.preventDefault(); setDropHover(false); load(e.dataTransfer.files[0]); }}
+                onDragOver={e => { e.preventDefault(); setDropHover(true); }}
+                onDragLeave={() => setDropHover(false)}>
+                <canvas ref={canvasRef} width={CANVAS_W} height={CANVAS_H}
+                  style={{ width: '100%', height: '100%', display: 'block' }} />
+                {canPan && (
+                  <div className="absolute bottom-2 right-2 text-white/40 text-xs pointer-events-none"
+                    style={{ letterSpacing: '0.1em' }}>DRAG TO PAN</div>
+                )}
+                {dropHover && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-stone-900/20">
+                    <span className="text-white text-xs tracking-widest">DROP IMAGE</span>
+                  </div>
+                )}
               </div>
-              <p className="text-xs text-stone-400" style={{letterSpacing:'0.1em'}}>
+              <p className="text-xs text-stone-400" style={{ letterSpacing: '0.1em' }}>
                 {CANVAS_W} × {CANVAS_H} · CLICK OR DRAG TO UPLOAD
               </p>
             </div>
 
             <div className="flex-1 flex flex-col gap-9 pt-1">
+
               <Section label="Photo">
-                <button onClick={()=>fileRef.current?.click()}
+                <button onClick={() => fileRef.current?.click()}
                   className="w-full py-2.5 border border-stone-300 text-stone-600 text-xs hover:border-stone-500 hover:text-stone-800 transition-colors tracking-widest">
-                  {image?'REPLACE PHOTO':'UPLOAD PHOTO'}</button>
-                <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={e=>load(e.target.files[0])}/>
+                  {image ? 'REPLACE PHOTO' : 'UPLOAD PHOTO'}
+                </button>
+                <input ref={fileRef} type="file" accept="image/*" className="hidden"
+                  onChange={e => load(e.target.files[0])} />
+              </Section>
+
+              <Section label="Bottom section">
+                <div className="flex gap-2">
+                  {['photo', 'color'].map(m => (
+                    <button key={m} onClick={() => setBotMode(m)}
+                      className={`flex-1 py-2 text-xs tracking-widest border transition-colors
+                        ${botMode === m ? 'border-stone-700 bg-stone-800 text-stone-50' : 'border-stone-300 text-stone-500 hover:border-stone-500'}`}>
+                      {m === 'photo' ? 'PHOTO' : 'COLOR'}
+                    </button>
+                  ))}
+                </div>
+                {botMode === 'color' && (
+                  <div className="mt-3">
+                    <ColorPicker color={botColor} onChange={setBotColor} />
+                  </div>
+                )}
               </Section>
 
               <Section label="Title">
-                <input type="text" value={title} onChange={e=>setTitle(e.target.value)}
+                <input type="text" value={title} onChange={e => setTitle(e.target.value)}
                   className="w-full border-b border-stone-200 focus:border-stone-600 outline-none py-1.5 text-stone-800 text-sm bg-transparent transition-colors tracking-widest"
-                  style={{fontFamily:"'Courier Prime','Courier New',monospace"}}
-                  placeholder="ENTER TITLE..."/>
+                  style={{ fontFamily: "'Courier Prime','Courier New',monospace" }}
+                  placeholder="ENTER TITLE..." />
               </Section>
 
               <Section label="Date">
-                <p className="text-stone-500 text-xs tracking-widest">{today}</p>
-                <p className="text-xs text-stone-400 mt-1">auto-generated</p>
+                <div className="flex items-center gap-3">
+                  <input type="text" value={dateText} onChange={e => setDateText(e.target.value)}
+                    className="flex-1 border-b border-stone-200 focus:border-stone-600 outline-none py-1.5 text-stone-600 text-xs bg-transparent transition-colors tracking-widest"
+                    style={{ fontFamily: "'Courier Prime','Courier New',monospace" }} />
+                  <button onClick={() => setDateText(AUTO_DATE)}
+                    className="text-xs text-stone-400 hover:text-stone-700 transition-colors tracking-widest flex-shrink-0">
+                    RESET
+                  </button>
+                </div>
               </Section>
 
-              <Section label="Split ratio" value={`${Math.round(split*100)} / ${Math.round((1-split)*100)}`}>
+              <Section label="Split ratio" value={`${Math.round(split * 100)} / ${Math.round((1 - split) * 100)}`}>
                 <input type="range" min="0.2" max="0.75" step="0.01" value={split}
-                  onChange={e=>setSplit(parseFloat(e.target.value))} className="mt-2"/>
+                  onChange={e => setSplit(parseFloat(e.target.value))} className="mt-2" />
               </Section>
 
               <Section label="Font size" value={`${fontSize}px`}>
                 <input type="range" min="12" max="72" step="1" value={fontSize}
-                  onChange={e=>setFontSize(parseInt(e.target.value))} className="mt-2"/>
+                  onChange={e => setFontSize(parseInt(e.target.value))} className="mt-2" />
               </Section>
 
               <Section label="Background color">
-                <div className="flex items-center gap-3 mt-0.5">
-                  <div className="relative w-10 h-7 border border-stone-300 overflow-hidden flex-shrink-0">
-                    <input type="color" value={bgColor} onChange={e=>setBgColor(e.target.value)}
-                      className="absolute -inset-1 cursor-pointer opacity-0" style={{width:'calc(100% + 8px)',height:'calc(100% + 8px)'}}/>
-                    <div className="absolute inset-0" style={{background:bgColor,pointerEvents:'none'}}/>
-                  </div>
-                  <span className="text-xs text-stone-600 font-mono tracking-widest">{bgColor.toUpperCase()}</span>
-                  <span className="text-xs text-stone-400">auto-extracted</span>
-                </div>
+                <ColorPicker color={bgColor} onChange={setBgColor} label="auto-extracted" />
               </Section>
 
               <div className="pt-5 mt-2 border-t border-stone-200">
@@ -262,7 +369,7 @@
       );
     }
 
-    ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
   </script>
 </body>
 </html>
