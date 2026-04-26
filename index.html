@@ -48,7 +48,7 @@
         date: 'Date', datePh: 'leave empty to hide', reset: 'RESET',
         split: 'Split ratio', fontSize: 'Font size', bgColor: 'Background color',
         fromPhoto: 'from photo', autoExtracted: 'auto-extracted', random: '↻ RANDOM',
-        exportBtn: 'EXPORT AS PNG', exportNote: `exports at ${CANVAS_W} × ${CANVAS_H}px`,
+        exportBtn: 'EXPORT AS PNG', exportNote: 'exports at full resolution',
         exportVideoBtn: 'EXPORT AS VIDEO', exportVideoNote: 'records up to 5 sec · exports as .mp4',
         recording: 'RECORDING…',
         saveHint: 'LONG PRESS IMAGE TO SAVE',
@@ -76,7 +76,7 @@
         date: '日期', datePh: '留空则不显示', reset: '重置',
         split: '分割比例', fontSize: '字体大小', bgColor: '背景颜色',
         fromPhoto: '来自照片', autoExtracted: '自动提取', random: '↻ 随机',
-        exportBtn: '导出 PNG', exportNote: `导出尺寸 ${CANVAS_W} × ${CANVAS_H}px`,
+        exportBtn: '导出 PNG', exportNote: '按原图分辨率导出',
         exportVideoBtn: '导出视频', exportVideoNote: '最长录制 5 秒 · 导出为 .mp4',
         recording: '录制中…',
         saveHint: '长按图片保存到相册',
@@ -567,7 +567,73 @@
 
       const exportPng = useCallback(() => {
         const filename = (title || 'cover').trim().replace(/\s+/g, '-').toLowerCase() + '.png';
-        canvasRef.current.toBlob(blob => {
+
+        // Scale export canvas to match original image resolution (no downscaling)
+        const topH_c = Math.round(CANVAS_H * split);
+        const botH_c = CANVAS_H - topH_c;
+        let scale = 1;
+        if (image) {
+          const iw = image.videoWidth || image.naturalWidth || image.width;
+          const ih = image.videoHeight || image.naturalHeight || image.height;
+          if (iw && ih) {
+            const ta = CANVAS_W / botH_c, ia = iw / ih;
+            const sw = ia > ta ? (ih / photoZoom) * ta : iw / photoZoom;
+            scale = Math.min(4, Math.max(1, sw / CANVAS_W));
+          }
+        }
+
+        const EW = Math.round(CANVAS_W * scale);
+        const EH = Math.round(CANVAS_H * scale);
+        const topH = Math.round(EH * split);
+        const botH = EH - topH;
+
+        const ec = document.createElement('canvas');
+        ec.width = EW; ec.height = EH;
+        const ctx = ec.getContext('2d');
+
+        drawGradBlock(ctx, bgColor, 0, 0, EW, topH, 38);
+
+        if (image) {
+          const iw = image.videoWidth || image.naturalWidth || image.width;
+          const ih = image.videoHeight || image.naturalHeight || image.height;
+          const ta = CANVAS_W / botH_c, ia = iw / ih;
+          let sw, sh;
+          if (ia > ta) { sh = ih / photoZoom; sw = sh * ta; }
+          else          { sw = iw / photoZoom; sh = sw / ta; }
+          const sx = Math.max(0, Math.min(iw - sw, (iw - sw) / 2 + pan.x));
+          const sy = Math.max(0, Math.min(ih - sh, (ih - sh) / 2 + pan.y));
+          ctx.drawImage(image, sx, sy, sw, sh, 0, topH, EW, botH);
+        } else {
+          ctx.fillStyle = '#b8afa6';
+          ctx.fillRect(0, topH, EW, botH);
+        }
+
+        const tc = getTextColor(bgColor);
+        const fs = Math.round(fontSize * scale);
+        ctx.fillStyle = tc; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.font = `400 ${fs}px "Courier Prime","Courier New",monospace`;
+        if ('letterSpacing' in ctx) ctx.letterSpacing = `${Math.round(6 * scale)}px`;
+        const lines = measureLines(ctx, title || ' ', EW * 0.7);
+        const btm = drawLines(ctx, lines, EW / 2, topH * 0.46, Math.round(fs * 1.5));
+
+        if (dateText) {
+          const ry = btm + Math.round(32 * scale);
+          ctx.strokeStyle = tc; ctx.globalAlpha = 0.3; ctx.lineWidth = Math.max(0.5, scale * 0.5);
+          ctx.beginPath();
+          ctx.moveTo(EW/2 - Math.round(40*scale), ry);
+          ctx.lineTo(EW/2 + Math.round(40*scale), ry);
+          ctx.stroke();
+          ctx.globalAlpha = 1;
+          const dfs = Math.round(Math.max(14, Math.round(fontSize * 0.7)) * scale);
+          ctx.font = `400 ${dfs}px "Courier Prime","Courier New",monospace`;
+          if ('letterSpacing' in ctx) ctx.letterSpacing = `${Math.round(4 * scale)}px`;
+          ctx.fillStyle = tc; ctx.globalAlpha = 0.55;
+          ctx.fillText(dateText, EW / 2, ry + Math.round(28 * scale));
+          ctx.globalAlpha = 1;
+          if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
+        }
+
+        ec.toBlob(blob => {
           const url = URL.createObjectURL(blob);
           if (isMobile) {
             setSavedImgUrl(url);
@@ -578,7 +644,7 @@
             setTimeout(() => URL.revokeObjectURL(url), 1000);
           }
         }, 'image/png');
-      }, [title, isMobile]);
+      }, [title, isMobile, image, split, bgColor, fontSize, photoZoom, pan, dateText]);
 
       return (
         <div className="bg-stone-50" style={{ fontFamily: "'Courier Prime','Courier New',monospace", ...(isMobile ? { height: viewH, overflow: 'hidden' } : { minHeight: '100vh' }) }}>
