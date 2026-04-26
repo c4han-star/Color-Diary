@@ -133,6 +133,7 @@
     }
 
     function addGrain(ctx, x, y, w, h, intensity) {
+      if (!intensity) return;
       const d = ctx.getImageData(x, y, w, h), px = d.data;
       for (let i = 0; i < px.length; i += 4) {
         const n = (Math.random() - 0.5) * intensity;
@@ -578,7 +579,7 @@
           if (iw && ih) {
             const ta = CANVAS_W / botH_c, ia = iw / ih;
             const sw = ia > ta ? (ih / photoZoom) * ta : iw / photoZoom;
-            scale = Math.min(4, Math.max(1, sw / CANVAS_W));
+            scale = Math.min(3, Math.max(1, sw / CANVAS_W));
           }
         }
 
@@ -591,7 +592,9 @@
         ec.width = EW; ec.height = EH;
         const ctx = ec.getContext('2d');
 
-        drawGradBlock(ctx, bgColor, 0, 0, EW, topH, 38);
+        ctx.fillStyle = bgColor;
+        ctx.fillRect(0, 0, EW, EH);
+        drawGradBlock(ctx, bgColor, 0, 0, EW, topH, 0);
 
         if (image) {
           const iw = image.videoWidth || image.naturalWidth || image.width;
