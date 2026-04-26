@@ -231,15 +231,25 @@
       const lastPinch = useRef(null);
 
       const [viewW, setViewW] = useState(window.innerWidth);
+      const [viewH, setViewH] = useState(window.innerHeight);
       useEffect(() => {
-        const handler = () => setViewW(window.innerWidth);
+        const handler = () => { setViewW(window.innerWidth); setViewH(window.innerHeight); };
         window.addEventListener('resize', handler);
         return () => window.removeEventListener('resize', handler);
       }, []);
       const isMobile = viewW < 640;
-      const basePW = isMobile ? Math.round(viewW * 0.62) : 400;
+      // Fixed dark workspace height: 57% of usable viewport (below ~54px header)
+      const darkAreaH = isMobile ? Math.max(220, Math.round((viewH - 54) * 0.57)) : 0;
+      // Default card occupies 75% of dark area height, centered → visible dark border
+      const basePW = isMobile
+        ? Math.round(darkAreaH * 0.75 * CANVAS_W / CANVAS_H)
+        : 400;
+      // Max card: nearly fills dark area (10px margin each side)
+      const maxPW = isMobile
+        ? Math.min(viewW - 16, Math.round((darkAreaH - 20) * CANVAS_W / CANVAS_H))
+        : 400;
       const PW = isMobile
-        ? Math.max(Math.round(viewW * 0.38), Math.min(viewW - 8, Math.round(basePW * canvasScale)))
+        ? Math.max(Math.round(basePW * 0.55), Math.min(maxPW, Math.round(basePW * canvasScale)))
         : 400;
       const PH = Math.round(PW / CANVAS_W * CANVAS_H);
 
@@ -464,7 +474,7 @@
         if (n === 2 && lastPinch.current) {
           const pts = Object.values(touches.current);
           const dist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
-          setCanvasScale(Math.max(0.38 / 0.62, Math.min((viewW - 8) / basePW,
+          setCanvasScale(Math.max(0.55, Math.min(maxPW / basePW,
             lastPinch.current.startScale * dist / lastPinch.current.dist)));
           return;
         }
@@ -584,10 +594,10 @@
 
             <div className="w-full sm:w-auto sm:flex-shrink-0 flex flex-col sm:items-center sm:gap-3">
 
-              {/* Mobile: dark canvas zone — card floats on dark bg */}
+              {/* Mobile: dark canvas zone — fixed height workspace, card floats centered */}
               {isMobile ? (
-                <div className="w-full bg-stone-900 flex items-center justify-center"
-                  style={{ paddingTop: 20, paddingBottom: 20 }}>
+                <div className="w-full bg-stone-900 flex items-center justify-center overflow-hidden"
+                  style={{ height: darkAreaH }}>
                   <div ref={wrapRef}
                     className={`relative overflow-hidden select-none ${dropHover ? 'ring-1 ring-white/30' : ''}`}
                     style={{ width: PW, height: PH, touchAction: 'none', boxShadow: '0 8px 32px rgba(0,0,0,0.55)' }}
