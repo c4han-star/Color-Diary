@@ -330,8 +330,12 @@
           img.src = url;
         } else if (file.type.startsWith('video/')) {
           const vid = document.createElement('video');
-          vid.muted = true; vid.loop = true; vid.playsInline = true;
-          vid.addEventListener('loadeddata', () => afterLoad(vid, 'video'), { once: true });
+          vid.muted = true; vid.loop = true; vid.playsInline = true; vid.preload = 'auto';
+          let done = false;
+          const onReady = () => { if (!done) { done = true; afterLoad(vid, 'video'); } };
+          vid.addEventListener('loadedmetadata', onReady, { once: true });
+          vid.addEventListener('loadeddata',     onReady, { once: true });
+          vid.addEventListener('canplay',        onReady, { once: true });
           vid.src = url;
           vid.load();
         }
