@@ -55,8 +55,8 @@
         uploadPrompt: 'UPLOAD A PHOTO OR VIDEO',
         captionEmpty: `${CANVAS_W} × ${CANVAS_H} · CLICK OR DRAG TO UPLOAD`,
         captionImage: 'DRAG TO REPOSITION · CLICK TO REPLACE',
-        dragHint: 'DRAG TO REPOSITION', dragHintTouch: 'HOLD & DRAG TO REPOSITION',
-        captionImageTouch: 'HOLD & DRAG · TAP TO REPLACE',
+        dragHint: 'DRAG TO REPOSITION', dragHintTouch: 'TWO FINGERS TO REPOSITION',
+        captionImageTouch: 'TWO-FINGER DRAG · TAP TO REPLACE',
         dropImage: 'DROP FILE',
         aboutText: [
           "I'm a product designer who loves editing photos — and yes, I probably spend too much time on Xiaohongshu and Instagram.",
@@ -81,8 +81,8 @@
         uploadPrompt: '上传照片或视频',
         captionEmpty: `${CANVAS_W} × ${CANVAS_H} · 点击或拖拽上传`,
         captionImage: '拖拽调整位置 · 点击重新上传',
-        dragHint: '拖拽调整位置', dragHintTouch: '长按拖拽调整位置',
-        captionImageTouch: '长按拖拽 · 点击换图',
+        dragHint: '拖拽调整位置', dragHintTouch: '双指拖动调整位置',
+        captionImageTouch: '双指拖动 · 点击换图',
         dropImage: '松开上传',
         aboutText: [
           "我是个很爱修图的产品设计师（也确实在小红书和 IG 上待太久了）。",
@@ -437,31 +437,25 @@
         const n = Object.keys(touches.current).length;
 
         if (n === 1) {
-          const rect = wrapRef.current.getBoundingClientRect();
-          const yRel = (e.clientY - rect.top) / rect.height;
-          const inImg = yRel >= split && !!image;
-          clearTimeout(longPressTimer.current);
-          ps.current = { on: true, sx: e.clientX, sy: e.clientY, spx: pan.x, spy: pan.y, moved: false, inImg, dragActive: false };
-          if (inImg) {
-            if (e.pointerType === 'touch') {
-              longPressTimer.current = setTimeout(() => {
-                ps.current.dragActive = true;
-                setDragReady(true);
-                setTimeout(() => setDragReady(false), 700);
-                try { navigator.vibrate?.(40); } catch(_) {}
-              }, 400);
-            } else {
+          ps.current = { sx: e.clientX, sy: e.clientY, spx: pan.x, spy: pan.y, moved: false, dragActive: false };
+          // Desktop mouse: drag in photo area pans the photo
+          if (e.pointerType === 'mouse' && image) {
+            const rect = wrapRef.current.getBoundingClientRect();
+            if ((e.clientY - rect.top) / rect.height >= split) {
               ps.current.dragActive = true;
               e.preventDefault();
             }
           }
         } else if (n === 2) {
-          clearTimeout(longPressTimer.current);
-          ps.current.on = false;
+          // Two touches: pinch-scale + two-finger photo pan
+          ps.current = { moved: true }; // prevent tap-to-upload
           const pts = Object.values(touches.current);
+          const midX = (pts[0].x + pts[1].x) / 2;
+          const midY = (pts[0].y + pts[1].y) / 2;
           lastPinch.current = {
             dist: Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y),
             startScale: canvasScale,
+            prevMidX: midX, prevMidY: midY,
           };
         }
       };
@@ -473,43 +467,57 @@
 
         if (n === 2 && lastPinch.current) {
           const pts = Object.values(touches.current);
-          const dist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
+          const newDist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
+          const newMidX = (pts[0].x + pts[1].x) / 2;
+          const newMidY = (pts[0].y + pts[1].y) / 2;
+
+          // Pinch: scale the canvas card
           setCanvasScale(Math.max(0.55, Math.min(maxPW / basePW,
-            lastPinch.current.startScale * dist / lastPinch.current.dist)));
+            lastPinch.current.startScale * newDist / lastPinch.current.dist)));
+
+          // Two-finger drag: pan the photo inside the card
+          if (image) {
+            const dmx = newMidX - lastPinch.current.prevMidX;
+            const dmy = newMidY - lastPinch.current.prevMidY;
+            const botH = CANVAS_H - Math.round(CANVAS_H * split);
+            const botH_p = PH - Math.round(PH * split);
+            const ia = image.width / image.height, ta = CANVAS_W / botH;
+            const pxScale = ia > ta ? image.height / botH_p : image.width / PW;
+            setPan(prev => ({ x: prev.x - dmx * pxScale, y: prev.y - dmy * pxScale }));
+          }
+          lastPinch.current.prevMidX = newMidX;
+          lastPinch.current.prevMidY = newMidY;
           return;
         }
 
-        if (!ps.current.on) return;
+        if (!ps.current) return;
         const dx = e.clientX - ps.current.sx, dy = e.clientY - ps.current.sy;
-        const dist = Math.hypot(dx, dy);
-        if (dist > 4) ps.current.moved = true;
-        if (dist > 12 && !ps.current.dragActive) {
-          clearTimeout(longPressTimer.current); ps.current.on = false; return;
+        if (Math.hypot(dx, dy) > 8) ps.current.moved = true;
+
+        // Desktop mouse drag to pan photo
+        if (e.pointerType === 'mouse' && ps.current.dragActive && image) {
+          const botH = CANVAS_H - Math.round(CANVAS_H * split);
+          const botH_p = PH - Math.round(PH * split);
+          const ia = image.width / image.height, ta = CANVAS_W / botH;
+          const baseScale = ia > ta ? image.height / botH_p : image.width / PW;
+          setPan({ x: ps.current.spx - dx * baseScale, y: ps.current.spy - dy * baseScale });
         }
-        if (!ps.current.dragActive || !ps.current.inImg) return;
-        const botH = CANVAS_H - Math.round(CANVAS_H * split);
-        const botH_p = PH - Math.round(PH * split);
-        const ia = image.width / image.height, ta = CANVAS_W / botH;
-        const baseScale = ia > ta ? image.height / botH_p : image.width / PW;
-        setPan({ x: ps.current.spx - dx * baseScale, y: ps.current.spy - dy * baseScale });
       };
 
       const onPointerUp = (e) => {
         delete touches.current[e.pointerId];
         const n = Object.keys(touches.current).length;
         if (n < 2) lastPinch.current = null;
-        if (n === 0) {
-          clearTimeout(longPressTimer.current);
-          if (!ps.current.moved && !ps.current.dragActive) fileRef.current?.click();
-          ps.current.on = false;
+        if (n === 0 && ps.current) {
+          if (!ps.current.moved) fileRef.current?.click();
+          ps.current = null;
         }
       };
 
       const onPointerCancel = (e) => {
         delete touches.current[e.pointerId];
         if (Object.keys(touches.current).length === 0) {
-          clearTimeout(longPressTimer.current);
-          ps.current.on = false; lastPinch.current = null;
+          ps.current = null; lastPinch.current = null;
         }
       };
 
@@ -600,7 +608,7 @@
                   style={{ height: darkAreaH }}>
                   <div ref={wrapRef}
                     className={`relative overflow-hidden select-none ${dropHover ? 'ring-1 ring-white/30' : ''}`}
-                    style={{ width: PW, height: PH, touchAction: 'none', boxShadow: '0 8px 32px rgba(0,0,0,0.55)' }}
+                    style={{ width: PW, height: PH, touchAction: 'pan-y', boxShadow: '0 8px 32px rgba(0,0,0,0.55)' }}
                     onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp}
                     onPointerLeave={onPointerCancel} onPointerCancel={onPointerCancel}
                     onDrop={e => { e.preventDefault(); setDropHover(false); load(e.dataTransfer.files[0]); }}
@@ -608,7 +616,7 @@
                     onDragLeave={() => setDropHover(false)}>
                     <canvas ref={canvasRef} width={CANVAS_W} height={CANVAS_H}
                       style={{ width: '100%', height: '100%', display: 'block' }} />
-                    {showPanHint && (
+                    {showPanHint && image && (
                       <div className="absolute inset-0 flex flex-col items-center justify-end pointer-events-none"
                         style={{ paddingBottom: `${Math.round(PH * 0.28)}px` }}>
                         <div className="bg-stone-900/60 text-white text-xs px-4 py-2 tracking-widest"
@@ -616,10 +624,6 @@
                           {t.dragHintTouch}
                         </div>
                       </div>
-                    )}
-                    {dragReady && (
-                      <div className="absolute inset-0 pointer-events-none"
-                        style={{ boxShadow: 'inset 0 0 0 3px rgba(255,255,255,0.6)' }} />
                     )}
                     {dropHover && (
                       <div className="absolute inset-0 flex items-center justify-center bg-stone-900/20">
