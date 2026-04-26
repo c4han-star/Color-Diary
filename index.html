@@ -31,7 +31,53 @@
   <script type="text/babel">
     const { useState, useRef, useEffect, useCallback } = React;
     const CANVAS_W = 1000, CANVAS_H = 1400;
-    const AUTO_DATE = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }).toUpperCase();
+    const AUTO_DATE_EN = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }).toUpperCase();
+    const AUTO_DATE_CN = new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' });
+
+    const T = {
+      en: {
+        about: 'ABOUT', close: 'CLOSE',
+        photo: 'Photo', upload: 'UPLOAD PHOTO', replace: 'REPLACE PHOTO',
+        title: 'Title', titlePh: 'ENTER TITLE...',
+        date: 'Date', datePh: 'leave empty to hide', reset: 'RESET',
+        split: 'Split ratio', fontSize: 'Font size', bgColor: 'Background color',
+        fromPhoto: 'from photo', autoExtracted: 'auto-extracted', random: '↻ RANDOM',
+        exportBtn: 'EXPORT AS PNG', exportNote: `exports at ${CANVAS_W} × ${CANVAS_H}px`,
+        uploadPrompt: 'UPLOAD A PHOTO',
+        captionEmpty: `${CANVAS_W} × ${CANVAS_H} · CLICK OR DRAG TO UPLOAD`,
+        captionImage: 'DRAG PHOTO TO REPOSITION · CLICK TO REPLACE',
+        dragHint: 'DRAG PHOTO TO REPOSITION', dropImage: 'DROP IMAGE',
+        aboutText: [
+          "I'm a product designer who loves editing photos — and yes, I probably spend too much time on Xiaohongshu and Instagram.",
+          "Color Diary came from a very real problem: I kept seeing those clean, split-style covers everywhere, tried making a few myself… and realized it was way more work than it should be.",
+          "So I made a shortcut.",
+          "Upload a photo, and it pulls the colors, builds the gradient, and lays everything out for you. You just drag, type, and export. Done.",
+          "It's not trying to replace design tools — it's just here to make this one thing ridiculously easy (and a bit more fun).",
+          "If you're into this kind of stuff, I'm probably posting more of it on Xiaohongshu and Instagram."
+        ]
+      },
+      cn: {
+        about: '关于', close: '关闭',
+        photo: '照片', upload: '上传照片', replace: '更换照片',
+        title: '标题', titlePh: '输入标题…',
+        date: '日期', datePh: '留空则不显示', reset: '重置',
+        split: '分割比例', fontSize: '字体大小', bgColor: '背景颜色',
+        fromPhoto: '来自照片', autoExtracted: '自动提取', random: '↻ 随机',
+        exportBtn: '导出 PNG', exportNote: `导出尺寸 ${CANVAS_W} × ${CANVAS_H}px`,
+        uploadPrompt: '上传一张照片',
+        captionEmpty: `${CANVAS_W} × ${CANVAS_H} · 点击或拖拽上传`,
+        captionImage: '拖拽调整位置 · 点击更换照片',
+        dragHint: '拖拽调整照片位置', dropImage: '松开上传',
+        aboutText: [
+          "我是一个热爱修图的产品设计师——对，我可能在小红书和 Instagram 上花了太多时间。",
+          "Color Diary 来自一个真实的烦恼：我到处看到那种简洁的分割式封面，自己试着做了几张……才发现这比想象中麻烦多了。",
+          "于是我做了一个捷径。",
+          "上传一张照片，它会自动提取颜色、生成渐变，帮你把一切排好。你只需要拖一拖、打几个字、导出。搞定。",
+          "它不是要取代设计工具——只是让这一件事变得极其简单（顺便好玩一点）。",
+          "如果你也喜欢这类东西，我应该还会在小红书和 Instagram 上分享更多。"
+        ]
+      }
+    };
 
     function hexToRgb(hex) {
       return { r: parseInt(hex.slice(1,3),16), g: parseInt(hex.slice(3,5),16), b: parseInt(hex.slice(5,7),16) };
@@ -88,7 +134,7 @@
       addGrain(ctx, x, y, w, h, grain);
     }
 
-    function ColorPicker({ color, onChange, onRandom, palette, label }) {
+    function ColorPicker({ color, onChange, onRandom, palette, label, randomLabel }) {
       return (
         <div className="flex items-start gap-3">
           <div className="flex items-center gap-3 flex-1">
@@ -105,7 +151,7 @@
             <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
               <button onClick={onRandom}
                 className="text-xs text-stone-400 hover:text-stone-800 transition-colors tracking-widest">
-                ↻ RANDOM
+                {randomLabel || '↻ RANDOM'}
               </button>
               {palette && palette.length > 0 && (
                 <div className="flex gap-1">
@@ -135,6 +181,11 @@
     }
 
     function App() {
+      const [lang, setLang]           = useState('en');
+      const [showAbout, setShowAbout] = useState(false);
+      const t = T[lang];
+      const AUTO_DATE = lang === 'en' ? AUTO_DATE_EN : AUTO_DATE_CN;
+
       const [image, setImage]         = useState(null);
       const [title, setTitle]         = useState('Turn moments into color.');
       const [split, setSplit]         = useState(0.5);
@@ -142,7 +193,7 @@
       const [bgColor, setBgColor]     = useState('#c9bba8');
       const [palette, setPalette]     = useState([]);
       const [pan, setPan]             = useState({ x: 0, y: 0 });
-      const [dateText, setDateText]   = useState(AUTO_DATE);
+      const [dateText, setDateText]   = useState(AUTO_DATE_EN);
       const [showPanHint, setShowPanHint] = useState(false);
       const hintTimer = useRef(null);
       const [dropHover, setDropHover] = useState(false);
@@ -181,7 +232,7 @@
           ctx.fillStyle = 'rgba(250,249,247,0.3)';
           ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
           ctx.font = '24px "Courier Prime","Courier New",monospace';
-          ctx.fillText('UPLOAD A PHOTO', CANVAS_W / 2, topH + botH / 2);
+          ctx.fillText(t.uploadPrompt, CANVAS_W / 2, topH + botH / 2);
         }
 
         const tc = getTextColor(bgColor);
@@ -205,7 +256,7 @@
           ctx.globalAlpha = 1;
           if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
         }
-      }, [image, bgColor, title, split, fontSize, pan, dateText]);
+      }, [image, bgColor, title, split, fontSize, pan, dateText, lang]);
 
       useEffect(() => { draw(); }, [draw, fontsReady]);
 
@@ -269,8 +320,6 @@
         a.click();
       }, [title]);
 
-      const [showAbout, setShowAbout] = useState(false);
-
       return (
         <div className="min-h-screen bg-stone-50" style={{ fontFamily: "'Courier Prime','Courier New',monospace" }}>
 
@@ -281,15 +330,10 @@
                 onClick={e => e.stopPropagation()}>
                 <button onClick={() => setShowAbout(false)}
                   className="absolute top-5 right-6 text-stone-400 hover:text-stone-700 text-xs tracking-widest transition-colors">
-                  CLOSE
+                  {t.close}
                 </button>
                 <div className="flex flex-col gap-5 text-stone-600 text-sm leading-relaxed">
-                  <p>I'm a product designer who loves editing photos — and yes, I probably spend too much time on Xiaohongshu and Instagram.</p>
-                  <p>Color Diary came from a very real problem: I kept seeing those clean, split-style covers everywhere, tried making a few myself… and realized it was way more work than it should be.</p>
-                  <p>So I made a shortcut.</p>
-                  <p>Upload a photo, and it pulls the colors, builds the gradient, and lays everything out for you. You just drag, type, and export. Done.</p>
-                  <p>It's not trying to replace design tools — it's just here to make this one thing ridiculously easy (and a bit more fun).</p>
-                  <p>If you're into this kind of stuff, I'm probably posting more of it on Xiaohongshu and Instagram.</p>
+                  {t.aboutText.map((p, i) => <p key={i}>{p}</p>)}
                 </div>
               </div>
             </div>
@@ -299,10 +343,23 @@
             <div className="max-w-6xl mx-auto flex items-center gap-3">
               <img src="logo%20(1).png" alt="Color Diary" style={{height:'40px',width:'auto'}} />
               <span className="text-sm text-stone-600">Color Diary</span>
-              <button onClick={() => setShowAbout(true)}
-                className="ml-auto text-xs text-stone-400 hover:text-stone-700 tracking-widest transition-colors">
-                ABOUT
-              </button>
+              <div className="ml-auto flex items-center gap-4">
+                <div className="flex items-center gap-1 text-xs tracking-widest">
+                  <button onClick={() => setLang('en')}
+                    className={`transition-colors ${lang==='en' ? 'text-stone-800' : 'text-stone-400 hover:text-stone-600'}`}>
+                    EN
+                  </button>
+                  <span className="text-stone-300">/</span>
+                  <button onClick={() => setLang('cn')}
+                    className={`transition-colors ${lang==='cn' ? 'text-stone-800' : 'text-stone-400 hover:text-stone-600'}`}>
+                    CN
+                  </button>
+                </div>
+                <button onClick={() => setShowAbout(true)}
+                  className="text-xs text-stone-400 hover:text-stone-700 tracking-widest transition-colors">
+                  {t.about}
+                </button>
+              </div>
             </div>
           </header>
 
@@ -325,78 +382,79 @@
                     style={{ paddingBottom: `${Math.round(PH * 0.28)}px` }}>
                     <div className="bg-stone-900/60 text-white text-xs px-4 py-2 tracking-widest"
                       style={{ letterSpacing: '0.12em' }}>
-                      DRAG PHOTO TO REPOSITION
+                      {t.dragHint}
                     </div>
                   </div>
                 )}
                 {dropHover && (
                   <div className="absolute inset-0 flex items-center justify-center bg-stone-900/20">
-                    <span className="text-white text-xs tracking-widest">DROP IMAGE</span>
+                    <span className="text-white text-xs tracking-widest">{t.dropImage}</span>
                   </div>
                 )}
               </div>
               <p className="text-xs text-stone-400" style={{ letterSpacing: '0.1em' }}>
-                {image ? 'DRAG PHOTO TO REPOSITION · CLICK TO REPLACE' : `${CANVAS_W} × ${CANVAS_H} · CLICK OR DRAG TO UPLOAD`}
+                {image ? t.captionImage : t.captionEmpty}
               </p>
             </div>
 
             <div className="no-scrollbar flex-1 flex flex-col gap-5 overflow-y-auto" style={{height: PH}}>
 
-              <Section label="Photo">
+              <Section label={t.photo}>
                 <button onClick={() => fileRef.current?.click()}
                   className="w-full py-2 border border-stone-300 text-stone-600 text-xs hover:border-stone-500 hover:text-stone-800 transition-colors tracking-widest">
-                  {image ? 'REPLACE PHOTO' : 'UPLOAD PHOTO'}
+                  {image ? t.replace : t.upload}
                 </button>
                 <input ref={fileRef} type="file" accept="image/*" className="hidden"
                   onChange={e => load(e.target.files[0])} />
               </Section>
 
-              <Section label="Title">
+              <Section label={t.title}>
                 <input type="text" value={title} onChange={e => setTitle(e.target.value)}
                   className="w-full border-b border-stone-200 focus:border-stone-600 outline-none py-1 text-stone-800 text-sm bg-transparent transition-colors tracking-widest"
                   style={{ fontFamily: "'Courier Prime','Courier New',monospace" }}
-                  placeholder="ENTER TITLE..." />
+                  placeholder={t.titlePh} />
               </Section>
 
-              <Section label="Date">
+              <Section label={t.date}>
                 <div className="flex items-center gap-3">
                   <input type="text" value={dateText} onChange={e => setDateText(e.target.value)}
                     className="flex-1 border-b border-stone-200 focus:border-stone-600 outline-none py-1 text-stone-600 text-xs bg-transparent transition-colors tracking-widest"
                     style={{ fontFamily: "'Courier Prime','Courier New',monospace" }}
-                    placeholder="leave empty to hide" />
+                    placeholder={t.datePh} />
                   <button onClick={() => setDateText(AUTO_DATE)}
                     className="text-xs text-stone-400 hover:text-stone-700 transition-colors tracking-widest flex-shrink-0">
-                    RESET
+                    {t.reset}
                   </button>
                 </div>
               </Section>
 
-              <Section label="Split ratio" value={`${Math.round(split * 100)} / ${Math.round((1 - split) * 100)}`}>
+              <Section label={t.split} value={`${Math.round(split * 100)} / ${Math.round((1 - split) * 100)}`}>
                 <input type="range" min="0.2" max="0.75" step="0.01" value={split}
                   onChange={e => setSplit(parseFloat(e.target.value))} className="mt-1.5" />
               </Section>
 
-              <Section label="Font size" value={`${fontSize}px`}>
+              <Section label={t.fontSize} value={`${fontSize}px`}>
                 <input type="range" min="12" max="72" step="1" value={fontSize}
                   onChange={e => setFontSize(parseInt(e.target.value))} className="mt-1.5" />
               </Section>
 
-              <Section label="Background color">
+              <Section label={t.bgColor}>
                 <ColorPicker
                   color={bgColor}
                   onChange={setBgColor}
                   onRandom={palette.length > 0 ? randomFromPalette : null}
                   palette={palette}
-                  label={palette.length > 0 ? 'from photo' : 'auto-extracted'}
+                  label={palette.length > 0 ? t.fromPhoto : t.autoExtracted}
+                  randomLabel={t.random}
                 />
               </Section>
 
               <div className="pt-3 mt-auto border-t border-stone-200">
                 <button onClick={exportPng}
                   className="w-full py-3 bg-stone-800 text-stone-50 text-xs tracking-widest hover:bg-stone-900 transition-colors">
-                  EXPORT AS PNG
+                  {t.exportBtn}
                 </button>
-                <p className="text-xs text-stone-400 text-center mt-1.5">exports at {CANVAS_W} × {CANVAS_H}px</p>
+                <p className="text-xs text-stone-400 text-center mt-1.5">{t.exportNote}</p>
               </div>
             </div>
           </main>
