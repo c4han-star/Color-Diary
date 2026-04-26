@@ -509,8 +509,21 @@
             </div>
           </header>
 
-          <main className="max-w-6xl mx-auto px-4 sm:px-12 pt-8 sm:pt-14 pb-28 sm:pb-8 flex flex-col sm:flex-row gap-8 sm:gap-12 items-start">
+          <main className="max-w-6xl mx-auto px-4 sm:px-12 pt-8 sm:pt-14 pb-8 flex flex-col sm:flex-row gap-8 sm:gap-12 items-start">
             <div className="w-full sm:w-auto sm:flex-shrink-0 flex flex-col items-center gap-3">
+              {isMobile && (
+                <div className="w-full flex items-center justify-between">
+                  <span className="text-xs text-stone-400" style={{letterSpacing:'0.1em'}}>
+                    {sourceType === 'video' ? t.exportVideoNote : t.exportNote}
+                  </span>
+                  <button
+                    onClick={sourceType === 'video' ? exportVideo : exportPng}
+                    disabled={isExporting}
+                    className="px-5 py-2 bg-stone-800 text-stone-50 text-xs tracking-widest hover:bg-stone-900 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                    {isExporting ? t.recording : sourceType === 'video' ? t.exportVideoBtn : t.exportBtn}
+                  </button>
+                </div>
+              )}
               <div ref={wrapRef}
                 className={`relative overflow-hidden select-none ${image ? 'cursor-grab' : 'cursor-pointer'} ${dropHover ? 'shadow-lg ring-1 ring-stone-400' : 'shadow-sm'}`}
                 style={{ width: PW, height: PH, background: '#e7e3de', touchAction: 'none' }}
@@ -615,19 +628,6 @@
             </div>
           </main>
 
-          {isMobile && (
-            <div className="fixed bottom-0 inset-x-0 z-40 bg-stone-50 border-t border-stone-200 px-4 py-3">
-              <button
-                onClick={sourceType === 'video' ? exportVideo : exportPng}
-                disabled={isExporting}
-                className="w-full py-3 bg-stone-800 text-stone-50 text-xs tracking-widest hover:bg-stone-900 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                {isExporting ? t.recording : sourceType === 'video' ? t.exportVideoBtn : t.exportBtn}
-              </button>
-              <p className="text-xs text-stone-400 text-center mt-1.5">
-                {sourceType === 'video' ? t.exportVideoNote : t.exportNote}
-              </p>
-            </div>
-          )}
         </div>
       );
     }
