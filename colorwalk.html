@@ -237,9 +237,9 @@
         return () => window.removeEventListener('resize', handler);
       }, []);
       const isMobile = viewW < 640;
-      const basePW = isMobile ? Math.round(viewW * 0.72) : 400;
+      const basePW = isMobile ? Math.round(viewW * 0.62) : 400;
       const PW = isMobile
-        ? Math.max(Math.round(viewW * 0.35), Math.min(viewW - 8, Math.round(basePW * canvasScale)))
+        ? Math.max(Math.round(viewW * 0.38), Math.min(viewW - 8, Math.round(basePW * canvasScale)))
         : 400;
       const PH = Math.round(PW / CANVAS_W * CANVAS_H);
 
@@ -464,7 +464,7 @@
         if (n === 2 && lastPinch.current) {
           const pts = Object.values(touches.current);
           const dist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
-          setCanvasScale(Math.max(0.35 / 0.72, Math.min((viewW - 8) / basePW,
+          setCanvasScale(Math.max(0.38 / 0.62, Math.min((viewW - 8) / basePW,
             lastPinch.current.startScale * dist / lastPinch.current.dist)));
           return;
         }
@@ -584,10 +584,10 @@
 
             <div className="w-full sm:w-auto sm:flex-shrink-0 flex flex-col sm:items-center sm:gap-3">
 
-              {/* Mobile: dark canvas zone — card floats on dark bg, export below */}
+              {/* Mobile: dark canvas zone — card floats on dark bg */}
               {isMobile ? (
-                <div className="w-full bg-stone-900 flex flex-col items-center justify-center"
-                  style={{ paddingTop: 24, paddingBottom: 24, minHeight: PH + 80 }}>
+                <div className="w-full bg-stone-900 flex items-center justify-center"
+                  style={{ paddingTop: 20, paddingBottom: 20 }}>
                   <div ref={wrapRef}
                     className={`relative overflow-hidden select-none ${dropHover ? 'ring-1 ring-white/30' : ''}`}
                     style={{ width: PW, height: PH, touchAction: 'none', boxShadow: '0 8px 32px rgba(0,0,0,0.55)' }}
@@ -616,12 +616,6 @@
                         <span className="text-white text-xs tracking-widest">{t.dropImage}</span>
                       </div>
                     )}
-                  </div>
-                  <div className="mt-5">
-                    <button onClick={sourceType === 'video' ? exportVideo : exportPng} disabled={isExporting}
-                      className="px-8 py-2.5 bg-stone-100 text-stone-900 text-xs tracking-widest disabled:opacity-50">
-                      {isExporting ? t.recording : sourceType === 'video' ? t.exportVideoBtn : t.exportBtn}
-                    </button>
                   </div>
                 </div>
               ) : (
@@ -654,6 +648,19 @@
                       <span className="text-white text-xs tracking-widest">{t.dropImage}</span>
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* Mobile: export row between dark area and tab bar */}
+              {isMobile && (
+                <div className="px-5 py-3 flex items-center justify-between w-full border-b border-stone-100 bg-stone-50">
+                  <span className="text-xs text-stone-400" style={{ letterSpacing: '0.07em' }}>
+                    {sourceType === 'video' ? t.exportVideoNote : t.exportNote}
+                  </span>
+                  <button onClick={sourceType === 'video' ? exportVideo : exportPng} disabled={isExporting}
+                    className="px-5 py-2 bg-stone-800 text-stone-50 text-xs tracking-widest disabled:opacity-50 flex-shrink-0">
+                    {isExporting ? t.recording : sourceType === 'video' ? t.exportVideoBtn : t.exportBtn}
+                  </button>
                 </div>
               )}
 
