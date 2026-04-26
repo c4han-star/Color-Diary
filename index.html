@@ -230,6 +230,7 @@
       const longPressTimer = useRef(null);
       const touches = useRef({});
       const lastPinch = useRef(null);
+      const videoElRef = useRef(null); // keeps video element in DOM for iOS canvas drawImage
 
       const [viewW, setViewW] = useState(window.innerWidth);
       const [viewH, setViewH] = useState(window.innerHeight);
@@ -301,6 +302,12 @@
 
       const load = useCallback(async (file) => {
         if (!file) return;
+        // Remove any previous video element from DOM
+        if (videoElRef.current) {
+          videoElRef.current.pause();
+          videoElRef.current.remove();
+          videoElRef.current = null;
+        }
         const url = URL.createObjectURL(file);
 
         const afterLoad = async (el, type) => {
@@ -331,8 +338,18 @@
         } else if (file.type.startsWith('video/')) {
           const vid = document.createElement('video');
           vid.muted = true; vid.loop = true; vid.playsInline = true; vid.preload = 'auto';
+          // iOS Safari requires the video element to be in the DOM for ctx.drawImage to decode frames
+          vid.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;pointer-events:none';
+          document.body.appendChild(vid);
+          videoElRef.current = vid;
           let done = false;
-          const onReady = () => { if (!done) { done = true; afterLoad(vid, 'video'); } };
+          const onReady = () => {
+            if (!done) {
+              done = true;
+              vid.play().catch(() => {});
+              afterLoad(vid, 'video');
+            }
+          };
           vid.addEventListener('loadedmetadata', onReady, { once: true });
           vid.addEventListener('loadeddata',     onReady, { once: true });
           vid.addEventListener('canplay',        onReady, { once: true });
