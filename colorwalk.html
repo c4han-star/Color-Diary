@@ -125,7 +125,7 @@
     function Section({ label, value, children }) {
       return (
         <div>
-          <div className="flex items-baseline justify-between mb-2.5">
+          <div className="flex items-baseline justify-between mb-1.5">
             <span className="text-xs text-stone-400 uppercase" style={{ letterSpacing: '0.14em' }}>{label}</span>
             {value && <span className="text-xs text-stone-400">{value}</span>}
           </div>
@@ -266,9 +266,10 @@
       return (
         <div className="min-h-screen bg-stone-50" style={{ fontFamily: "'Courier Prime','Courier New',monospace" }}>
           <header className="border-b border-stone-200 px-12 py-5">
-            <div className="max-w-6xl mx-auto flex items-center gap-5">
+            <div className="max-w-6xl mx-auto flex items-center gap-4">
               <img src="logo.png" alt="Color Diary" style={{height:'84px',width:'auto'}} />
-              <span className="text-sm text-stone-400">moments in color</span>
+              <span className="text-stone-300 text-lg font-light">/</span>
+              <span className="text-base text-stone-400">moments in color</span>
             </div>
           </header>
 
@@ -301,11 +302,11 @@
               </p>
             </div>
 
-            <div className="no-scrollbar flex-1 flex flex-col gap-8 overflow-y-auto" style={{height: PH}}>
+            <div className="no-scrollbar flex-1 flex flex-col gap-5 overflow-y-auto" style={{height: PH}}>
 
               <Section label="Photo">
                 <button onClick={() => fileRef.current?.click()}
-                  className="w-full py-2.5 border border-stone-300 text-stone-600 text-xs hover:border-stone-500 hover:text-stone-800 transition-colors tracking-widest">
+                  className="w-full py-2 border border-stone-300 text-stone-600 text-xs hover:border-stone-500 hover:text-stone-800 transition-colors tracking-widest">
                   {image ? 'REPLACE PHOTO' : 'UPLOAD PHOTO'}
                 </button>
                 <input ref={fileRef} type="file" accept="image/*" className="hidden"
@@ -314,15 +315,15 @@
 
               <Section label="Title">
                 <input type="text" value={title} onChange={e => setTitle(e.target.value)}
-                  className="w-full border-b border-stone-200 focus:border-stone-600 outline-none py-1.5 text-stone-800 text-sm bg-transparent transition-colors tracking-widest"
+                  className="w-full border-b border-stone-200 focus:border-stone-600 outline-none py-1 text-stone-800 text-sm bg-transparent transition-colors tracking-widest"
                   style={{ fontFamily: "'Courier Prime','Courier New',monospace" }}
                   placeholder="ENTER TITLE..." />
               </Section>
 
               <Section label="Date">
-                <div className="flex items-center gap-3 mb-3">
+                <div className="flex items-center gap-3 mb-2">
                   <input type="text" value={dateText} onChange={e => setDateText(e.target.value)}
-                    className="flex-1 border-b border-stone-200 focus:border-stone-600 outline-none py-1.5 text-stone-600 text-xs bg-transparent transition-colors tracking-widest"
+                    className="flex-1 border-b border-stone-200 focus:border-stone-600 outline-none py-1 text-stone-600 text-xs bg-transparent transition-colors tracking-widest"
                     style={{ fontFamily: "'Courier Prime','Courier New',monospace" }} />
                   <button onClick={() => setDateText(AUTO_DATE)}
                     className="text-xs text-stone-400 hover:text-stone-700 transition-colors tracking-widest flex-shrink-0">
@@ -334,12 +335,12 @@
 
               <Section label="Split ratio" value={`${Math.round(split * 100)} / ${Math.round((1 - split) * 100)}`}>
                 <input type="range" min="0.2" max="0.75" step="0.01" value={split}
-                  onChange={e => setSplit(parseFloat(e.target.value))} className="mt-2" />
+                  onChange={e => setSplit(parseFloat(e.target.value))} className="mt-1.5" />
               </Section>
 
               <Section label="Font size" value={`${fontSize}px`}>
                 <input type="range" min="12" max="72" step="1" value={fontSize}
-                  onChange={e => setFontSize(parseInt(e.target.value))} className="mt-2" />
+                  onChange={e => setFontSize(parseInt(e.target.value))} className="mt-1.5" />
               </Section>
 
               <Section label="Background color">
@@ -352,12 +353,12 @@
                 />
               </Section>
 
-              <div className="pt-5 mt-2 border-t border-stone-200">
+              <div className="pt-3 mt-auto border-t border-stone-200">
                 <button onClick={exportPng}
-                  className="w-full py-3.5 bg-stone-800 text-stone-50 text-xs tracking-widest hover:bg-stone-900 transition-colors">
+                  className="w-full py-3 bg-stone-800 text-stone-50 text-xs tracking-widest hover:bg-stone-900 transition-colors">
                   EXPORT AS PNG
                 </button>
-                <p className="text-xs text-stone-400 text-center mt-2">exports at {CANVAS_W} × {CANVAS_H}px</p>
+                <p className="text-xs text-stone-400 text-center mt-1.5">exports at {CANVAS_W} × {CANVAS_H}px</p>
               </div>
             </div>
           </main>
