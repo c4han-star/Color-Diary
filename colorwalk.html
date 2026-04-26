@@ -221,7 +221,7 @@
       const [dragReady, setDragReady] = useState(false);
       const [activeTab, setActiveTab] = useState('photo');
       const [savedImgUrl, setSavedImgUrl] = useState(null);
-      const [zoom, setZoom] = useState(1);
+      const [canvasScale, setCanvasScale] = useState(1);
 
       const canvasRef = useRef(null), fileRef = useRef(null), wrapRef = useRef(null);
       const ps = useRef({ on: false, sx: 0, sy: 0, spx: 0, spy: 0, moved: false, inImg: false, dragActive: false });
@@ -237,7 +237,10 @@
         return () => window.removeEventListener('resize', handler);
       }, []);
       const isMobile = viewW < 640;
-      const PW = isMobile ? viewW : 400;
+      const basePW = isMobile ? Math.round(viewW * 0.72) : 400;
+      const PW = isMobile
+        ? Math.max(Math.round(viewW * 0.35), Math.min(viewW - 8, Math.round(basePW * canvasScale)))
+        : 400;
       const PH = Math.round(PW / CANVAS_W * CANVAS_H);
 
       useEffect(() => { document.fonts.ready.then(() => setFontsReady(true)); }, []);
@@ -252,14 +255,16 @@
 
         if (image) {
           const ia = image.width / image.height, ta = CANVAS_W / botH;
-          let swBase, shBase;
-          if (ia > ta) { shBase = image.height; swBase = shBase * ta; }
-          else          { swBase = image.width;  shBase = swBase / ta; }
-          const sw = swBase / zoom, sh = shBase / zoom;
-          const cx = image.width  / 2 + pan.x;
-          const cy = image.height / 2 + pan.y;
-          const sx = Math.max(0, Math.min(image.width  - sw, cx - sw / 2));
-          const sy = Math.max(0, Math.min(image.height - sh, cy - sh / 2));
+          let sx, sy, sw, sh;
+          if (ia > ta) {
+            sh = image.height; sw = sh * ta;
+            sx = Math.max(0, Math.min(image.width - sw, (image.width - sw) / 2 + pan.x));
+            sy = 0;
+          } else {
+            sw = image.width; sh = sw / ta;
+            sx = 0;
+            sy = Math.max(0, Math.min(image.height - sh, (image.height - sh) / 2 + pan.y));
+          }
           ctx.drawImage(image, sx, sy, sw, sh, 0, topH, CANVAS_W, botH);
         } else {
           ctx.fillStyle = '#b8afa6';
@@ -291,7 +296,7 @@
           ctx.globalAlpha = 1;
           if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
         }
-      }, [image, bgColor, title, split, fontSize, pan, dateText, lang, zoom]);
+      }, [image, bgColor, title, split, fontSize, pan, dateText, lang]);
 
       useEffect(() => { draw(); }, [draw, fontsReady]);
 
@@ -300,7 +305,7 @@
         const url = URL.createObjectURL(file);
 
         const afterLoad = async (el, type) => {
-          setImage(el); setSourceType(type); setPan({ x: 0, y: 0 }); setZoom(1);
+          setImage(el); setSourceType(type); setPan({ x: 0, y: 0 }); setCanvasScale(1);
           clearTimeout(hintTimer.current);
           setShowPanHint(true);
           hintTimer.current = setTimeout(() => setShowPanHint(false), 2500);
@@ -446,7 +451,7 @@
           const pts = Object.values(touches.current);
           lastPinch.current = {
             dist: Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y),
-            startZoom: zoom,
+            startScale: canvasScale,
           };
         }
       };
@@ -456,10 +461,11 @@
         touches.current[e.pointerId] = { x: e.clientX, y: e.clientY };
         const n = Object.keys(touches.current).length;
 
-        if (n === 2 && lastPinch.current && image) {
+        if (n === 2 && lastPinch.current) {
           const pts = Object.values(touches.current);
           const dist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
-          setZoom(Math.max(1, Math.min(8, lastPinch.current.startZoom * dist / lastPinch.current.dist)));
+          setCanvasScale(Math.max(0.35 / 0.72, Math.min((viewW - 8) / basePW,
+            lastPinch.current.startScale * dist / lastPinch.current.dist)));
           return;
         }
 
@@ -475,7 +481,7 @@
         const botH_p = PH - Math.round(PH * split);
         const ia = image.width / image.height, ta = CANVAS_W / botH;
         const baseScale = ia > ta ? image.height / botH_p : image.width / PW;
-        setPan({ x: ps.current.spx - dx * baseScale / zoom, y: ps.current.spy - dy * baseScale / zoom });
+        setPan({ x: ps.current.spx - dx * baseScale, y: ps.current.spy - dy * baseScale });
       };
 
       const onPointerUp = (e) => {
@@ -578,50 +584,78 @@
 
             <div className="w-full sm:w-auto sm:flex-shrink-0 flex flex-col sm:items-center sm:gap-3">
 
-              {/* Mobile: export row above canvas */}
-              {isMobile && (
-                <div className="px-4 py-2.5 flex items-center justify-between border-b border-stone-100">
-                  <span className="text-xs text-stone-400" style={{letterSpacing:'0.08em'}}>
-                    {sourceType === 'video' ? t.exportVideoNote : t.exportNote}
-                  </span>
-                  <button onClick={sourceType === 'video' ? exportVideo : exportPng} disabled={isExporting}
-                    className="px-5 py-2 bg-stone-800 text-stone-50 text-xs tracking-widest transition-colors disabled:opacity-50">
-                    {isExporting ? t.recording : sourceType === 'video' ? t.exportVideoBtn : t.exportBtn}
-                  </button>
+              {/* Mobile: dark canvas zone — card floats on dark bg, export below */}
+              {isMobile ? (
+                <div className="w-full bg-stone-900 flex flex-col items-center justify-center"
+                  style={{ paddingTop: 24, paddingBottom: 24, minHeight: PH + 80 }}>
+                  <div ref={wrapRef}
+                    className={`relative overflow-hidden select-none ${dropHover ? 'ring-1 ring-white/30' : ''}`}
+                    style={{ width: PW, height: PH, touchAction: 'none', boxShadow: '0 8px 32px rgba(0,0,0,0.55)' }}
+                    onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp}
+                    onPointerLeave={onPointerCancel} onPointerCancel={onPointerCancel}
+                    onDrop={e => { e.preventDefault(); setDropHover(false); load(e.dataTransfer.files[0]); }}
+                    onDragOver={e => { e.preventDefault(); setDropHover(true); }}
+                    onDragLeave={() => setDropHover(false)}>
+                    <canvas ref={canvasRef} width={CANVAS_W} height={CANVAS_H}
+                      style={{ width: '100%', height: '100%', display: 'block' }} />
+                    {showPanHint && (
+                      <div className="absolute inset-0 flex flex-col items-center justify-end pointer-events-none"
+                        style={{ paddingBottom: `${Math.round(PH * 0.28)}px` }}>
+                        <div className="bg-stone-900/60 text-white text-xs px-4 py-2 tracking-widest"
+                          style={{ letterSpacing: '0.12em' }}>
+                          {t.dragHintTouch}
+                        </div>
+                      </div>
+                    )}
+                    {dragReady && (
+                      <div className="absolute inset-0 pointer-events-none"
+                        style={{ boxShadow: 'inset 0 0 0 3px rgba(255,255,255,0.6)' }} />
+                    )}
+                    {dropHover && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-stone-900/20">
+                        <span className="text-white text-xs tracking-widest">{t.dropImage}</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="mt-5">
+                    <button onClick={sourceType === 'video' ? exportVideo : exportPng} disabled={isExporting}
+                      className="px-8 py-2.5 bg-stone-100 text-stone-900 text-xs tracking-widest disabled:opacity-50">
+                      {isExporting ? t.recording : sourceType === 'video' ? t.exportVideoBtn : t.exportBtn}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                /* Desktop: canvas on light bg */
+                <div ref={wrapRef}
+                  className={`relative overflow-hidden select-none ${image ? 'cursor-grab' : 'cursor-pointer'} shadow-sm ${dropHover ? 'ring-1 ring-stone-400' : ''}`}
+                  style={{ width: PW, height: PH, background: '#e7e3de', touchAction: 'none' }}
+                  onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp}
+                  onPointerLeave={onPointerCancel} onPointerCancel={onPointerCancel}
+                  onDrop={e => { e.preventDefault(); setDropHover(false); load(e.dataTransfer.files[0]); }}
+                  onDragOver={e => { e.preventDefault(); setDropHover(true); }}
+                  onDragLeave={() => setDropHover(false)}>
+                  <canvas ref={canvasRef} width={CANVAS_W} height={CANVAS_H}
+                    style={{ width: '100%', height: '100%', display: 'block' }} />
+                  {showPanHint && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-end pointer-events-none"
+                      style={{ paddingBottom: `${Math.round(PH * 0.28)}px` }}>
+                      <div className="bg-stone-900/60 text-white text-xs px-4 py-2 tracking-widest"
+                        style={{ letterSpacing: '0.12em' }}>
+                        {t.dragHint}
+                      </div>
+                    </div>
+                  )}
+                  {dragReady && (
+                    <div className="absolute inset-0 pointer-events-none"
+                      style={{ boxShadow: 'inset 0 0 0 3px rgba(255,255,255,0.6)' }} />
+                  )}
+                  {dropHover && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-stone-900/20">
+                      <span className="text-white text-xs tracking-widest">{t.dropImage}</span>
+                    </div>
+                  )}
                 </div>
               )}
-
-              {/* Canvas */}
-              <div ref={wrapRef}
-                className={`relative overflow-hidden select-none ${image ? 'cursor-grab' : 'cursor-pointer'} ${dropHover ? 'ring-1 ring-stone-400' : ''} ${!isMobile ? 'shadow-sm' : ''}`}
-                style={{ width: PW, height: PH, background: '#e7e3de', touchAction: 'none' }}
-                onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp}
-                onPointerLeave={onPointerCancel}
-                onPointerCancel={onPointerCancel}
-                onDrop={e => { e.preventDefault(); setDropHover(false); load(e.dataTransfer.files[0]); }}
-                onDragOver={e => { e.preventDefault(); setDropHover(true); }}
-                onDragLeave={() => setDropHover(false)}>
-                <canvas ref={canvasRef} width={CANVAS_W} height={CANVAS_H}
-                  style={{ width: '100%', height: '100%', display: 'block' }} />
-                {showPanHint && (
-                  <div className="absolute inset-0 flex flex-col items-center justify-end pointer-events-none"
-                    style={{ paddingBottom: `${Math.round(PH * 0.28)}px` }}>
-                    <div className="bg-stone-900/60 text-white text-xs px-4 py-2 tracking-widest"
-                      style={{ letterSpacing: '0.12em' }}>
-                      {isMobile ? t.dragHintTouch : t.dragHint}
-                    </div>
-                  </div>
-                )}
-                {dragReady && (
-                  <div className="absolute inset-0 pointer-events-none"
-                    style={{ boxShadow: 'inset 0 0 0 3px rgba(255,255,255,0.6)' }} />
-                )}
-                {dropHover && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-stone-900/20">
-                    <span className="text-white text-xs tracking-widest">{t.dropImage}</span>
-                  </div>
-                )}
-              </div>
 
               {/* Desktop caption */}
               {!isMobile && (
