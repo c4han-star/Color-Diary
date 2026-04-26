@@ -12,6 +12,12 @@
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script src="https://unpkg.com/node-vibrant@3.1.6/dist/vibrant.min.js"></script>
+  <script type="module">
+    try {
+      const { Muxer, ArrayBufferTarget } = await import('https://unpkg.com/mp4-muxer@latest/build/mp4-muxer.js');
+      window.Mp4Muxer = { Muxer, ArrayBufferTarget };
+    } catch(e) { console.warn('mp4-muxer unavailable, will fall back to webm', e); }
+  </script>
   <style>
     * { box-sizing: border-box; }
     body { margin: 0; font-family: 'Courier Prime', 'Courier New', monospace; -webkit-font-smoothing: antialiased; }
@@ -43,7 +49,7 @@
         split: 'Split ratio', fontSize: 'Font size', bgColor: 'Background color',
         fromPhoto: 'from photo', autoExtracted: 'auto-extracted', random: '↻ RANDOM',
         exportBtn: 'EXPORT AS PNG', exportNote: `exports at ${CANVAS_W} × ${CANVAS_H}px`,
-        exportVideoBtn: 'EXPORT AS VIDEO', exportVideoNote: 'records up to 5 sec · exports as .webm',
+        exportVideoBtn: 'EXPORT AS VIDEO', exportVideoNote: 'records up to 5 sec · exports as .mp4',
         recording: 'RECORDING…',
         uploadPrompt: 'UPLOAD A PHOTO OR VIDEO',
         captionEmpty: `${CANVAS_W} × ${CANVAS_H} · CLICK OR DRAG TO UPLOAD`,
@@ -66,7 +72,7 @@
         split: '分割比例', fontSize: '字体大小', bgColor: '背景颜色',
         fromPhoto: '来自照片', autoExtracted: '自动提取', random: '↻ 随机',
         exportBtn: '导出 PNG', exportNote: `导出尺寸 ${CANVAS_W} × ${CANVAS_H}px`,
-        exportVideoBtn: '导出视频', exportVideoNote: '最长录制 5 秒 · 导出为 .webm',
+        exportVideoBtn: '导出视频', exportVideoNote: '最长录制 5 秒 · 导出为 .mp4',
         recording: '录制中…',
         uploadPrompt: '上传照片或视频',
         captionEmpty: `${CANVAS_W} × ${CANVAS_H} · 点击或拖拽上传`,
@@ -329,28 +335,73 @@
         return () => cancelAnimationFrame(animRef.current);
       }, [sourceType, image, draw]);
 
-      const exportVideo = useCallback(() => {
+      const exportVideo = useCallback(async () => {
         if (!image || sourceType !== 'video' || isExporting) return;
         setIsExporting(true);
+        const durationSec = Math.min(image.duration || 5, 5);
+        const stem = (title || 'cover').trim().replace(/\s+/g, '-').toLowerCase();
         image.currentTime = 0;
         image.play().catch(() => {});
-        const duration = Math.min(image.duration || 5, 5) * 1000;
+
+        // Path 1: WebCodecs + mp4-muxer → real MP4 (Chrome/Edge)
+        if (window.Mp4Muxer && typeof VideoEncoder !== 'undefined') {
+          try {
+            const { Muxer, ArrayBufferTarget } = window.Mp4Muxer;
+            const target = new ArrayBufferTarget();
+            const muxer = new Muxer({
+              target,
+              video: { codec: 'avc', width: CANVAS_W, height: CANVAS_H },
+              fastStart: 'in-memory',
+            });
+            const encoder = new VideoEncoder({
+              output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
+              error: console.error,
+            });
+            encoder.configure({
+              codec: 'avc1.42001f', width: CANVAS_W, height: CANVAS_H,
+              bitrate: 8_000_000, framerate: 30,
+            });
+            const fps = 30, total = Math.round(durationSec * fps);
+            await new Promise(resolve => {
+              let i = 0;
+              const id = setInterval(() => {
+                if (i >= total) { clearInterval(id); resolve(); return; }
+                const frame = new VideoFrame(canvasRef.current, {
+                  timestamp: Math.round(i / fps * 1_000_000),
+                });
+                encoder.encode(frame, { keyFrame: i % fps === 0 });
+                frame.close();
+                i++;
+              }, 1000 / fps);
+            });
+            await encoder.flush();
+            muxer.finalize();
+            const blob = new Blob([target.buffer], { type: 'video/mp4' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = stem + '.mp4';
+            a.click();
+            setIsExporting(false);
+            return;
+          } catch(e) { console.warn('WebCodecs failed, falling back', e); }
+        }
+
+        // Path 2: MediaRecorder → MP4 on Safari, WebM elsewhere
         const stream = canvasRef.current.captureStream(30);
-        const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
-          ? 'video/webm;codecs=vp9' : 'video/webm';
+        const mimeType = MediaRecorder.isTypeSupported('video/mp4') ? 'video/mp4' : 'video/webm';
         const recorder = new MediaRecorder(stream, { mimeType });
         const chunks = [];
         recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
         recorder.onstop = () => {
-          const blob = new Blob(chunks, { type: 'video/webm' });
+          const blob = new Blob(chunks, { type: mimeType });
           const a = document.createElement('a');
           a.href = URL.createObjectURL(blob);
-          a.download = (title || 'cover').trim().replace(/\s+/g, '-').toLowerCase() + '.webm';
+          a.download = stem + (mimeType.includes('mp4') ? '.mp4' : '.webm');
           a.click();
           setIsExporting(false);
         };
         recorder.start();
-        setTimeout(() => recorder.stop(), duration);
+        setTimeout(() => recorder.stop(), durationSec * 1000);
       }, [image, sourceType, isExporting, title]);
 
       const onPointerDown = (e) => {
