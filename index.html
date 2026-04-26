@@ -222,6 +222,7 @@
 
       const [activeTab, setActiveTab] = useState('photo');
       const [savedImgUrl, setSavedImgUrl] = useState(null);
+      const [photoZoom, setPhotoZoom] = useState(1);
 
       const canvasRef = useRef(null), fileRef = useRef(null), wrapRef = useRef(null);
       const ps = useRef({ on: false, sx: 0, sy: 0, spx: 0, spy: 0, moved: false, inImg: false, dragActive: false });
@@ -258,16 +259,11 @@
 
         if (image) {
           const ia = image.width / image.height, ta = CANVAS_W / botH;
-          let sx, sy, sw, sh;
-          if (ia > ta) {
-            sh = image.height; sw = sh * ta;
-            sx = Math.max(0, Math.min(image.width - sw, (image.width - sw) / 2 + pan.x));
-            sy = 0;
-          } else {
-            sw = image.width; sh = sw / ta;
-            sx = 0;
-            sy = Math.max(0, Math.min(image.height - sh, (image.height - sh) / 2 + pan.y));
-          }
+          let sw, sh;
+          if (ia > ta) { sh = image.height / photoZoom; sw = sh * ta; }
+          else          { sw = image.width  / photoZoom; sh = sw / ta; }
+          const sx = Math.max(0, Math.min(image.width  - sw, (image.width  - sw) / 2 + pan.x));
+          const sy = Math.max(0, Math.min(image.height - sh, (image.height - sh) / 2 + pan.y));
           ctx.drawImage(image, sx, sy, sw, sh, 0, topH, CANVAS_W, botH);
         } else {
           ctx.fillStyle = '#b8afa6';
@@ -299,7 +295,7 @@
           ctx.globalAlpha = 1;
           if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
         }
-      }, [image, bgColor, title, split, fontSize, pan, dateText, lang]);
+      }, [image, bgColor, title, split, fontSize, pan, dateText, lang, photoZoom]);
 
       useEffect(() => { draw(); }, [draw, fontsReady]);
 
@@ -308,7 +304,7 @@
         const url = URL.createObjectURL(file);
 
         const afterLoad = async (el, type) => {
-          setImage(el); setSourceType(type); setPan({ x: 0, y: 0 });
+          setImage(el); setSourceType(type); setPan({ x: 0, y: 0 }); setPhotoZoom(1);
           clearTimeout(hintTimer.current);
           setShowPanHint(true);
           hintTimer.current = setTimeout(() => setShowPanHint(false), 2500);
@@ -424,20 +420,20 @@
         setTimeout(() => recorder.stop(), durationSec * 1000);
       }, [image, sourceType, isExporting, title]);
 
-      // Clamp pan so photo never exposes empty space in its container
-      const clampPan = useCallback((nx, ny) => {
+      // Clamp pan so photo never exposes empty space (both axes, zoom-aware)
+      const clampPan = useCallback((nx, ny, zoom) => {
         if (!image) return { x: nx, y: ny };
         const botH = CANVAS_H - Math.round(CANVAS_H * split);
-        const ia = image.width / image.height, ta = CANVAS_W / botH;
-        if (ia > ta) {
-          const sw = image.height * ta;
-          const max = (image.width - sw) / 2;
-          return { x: Math.max(-max, Math.min(max, nx)), y: 0 };
-        } else {
-          const sh = image.width / ta;
-          const max = (image.height - sh) / 2;
-          return { x: 0, y: Math.max(-max, Math.min(max, ny)) };
-        }
+        const ta = CANVAS_W / botH, ia = image.width / image.height;
+        let sw, sh;
+        if (ia > ta) { sh = image.height / zoom; sw = sh * ta; }
+        else          { sw = image.width  / zoom; sh = sw / ta; }
+        const maxX = (image.width  - sw) / 2;
+        const maxY = (image.height - sh) / 2;
+        return {
+          x: Math.max(-maxX, Math.min(maxX, nx)),
+          y: Math.max(-maxY, Math.min(maxY, ny)),
+        };
       }, [image, split]);
 
       const onPointerDown = (e) => {
@@ -458,6 +454,8 @@
           ps.current = { moved: true };
           const pts = Object.values(touches.current);
           lastPinch.current = {
+            dist: Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y),
+            startZoom: photoZoom,
             prevMidX: (pts[0].x + pts[1].x) / 2,
             prevMidY: (pts[0].y + pts[1].y) / 2,
           };
@@ -471,15 +469,31 @@
 
         if (n === 2 && lastPinch.current && image) {
           const pts = Object.values(touches.current);
+          const newDist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
           const newMidX = (pts[0].x + pts[1].x) / 2;
           const newMidY = (pts[0].y + pts[1].y) / 2;
+
+          // Pinch → zoom photo inside container (min 1 = cover, max 5x)
+          const newZoom = Math.max(1, Math.min(5,
+            lastPinch.current.startZoom * newDist / lastPinch.current.dist));
+          setPhotoZoom(newZoom);
+
+          // Drag midpoint → pan photo, scale delta by current crop size
           const dmx = newMidX - lastPinch.current.prevMidX;
           const dmy = newMidY - lastPinch.current.prevMidY;
-          const botH = CANVAS_H - Math.round(CANVAS_H * split);
-          const botH_p = PH - Math.round(PH * split);
-          const ia = image.width / image.height, ta = CANVAS_W / botH;
-          const pxScale = ia > ta ? image.height / botH_p : image.width / PW;
-          setPan(prev => clampPan(prev.x - dmx * pxScale, prev.y - dmy * pxScale));
+          if (image && (Math.abs(dmx) > 0.3 || Math.abs(dmy) > 0.3)) {
+            const botH = CANVAS_H - Math.round(CANVAS_H * split);
+            const botH_p = PH - Math.round(PH * split);
+            const ta = CANVAS_W / botH, ia = image.width / image.height;
+            let sw, sh;
+            if (ia > ta) { sh = image.height / newZoom; sw = sh * ta; }
+            else          { sw = image.width  / newZoom; sh = sw / ta; }
+            setPan(prev => clampPan(
+              prev.x - dmx * (sw / PW),
+              prev.y - dmy * (sh / botH_p),
+              newZoom,
+            ));
+          }
           lastPinch.current.prevMidX = newMidX;
           lastPinch.current.prevMidY = newMidY;
           return;
@@ -492,9 +506,15 @@
         if (e.pointerType === 'mouse' && ps.current.dragActive && image) {
           const botH = CANVAS_H - Math.round(CANVAS_H * split);
           const botH_p = PH - Math.round(PH * split);
-          const ia = image.width / image.height, ta = CANVAS_W / botH;
-          const pxScale = ia > ta ? image.height / botH_p : image.width / PW;
-          setPan(clampPan(ps.current.spx - dx * pxScale, ps.current.spy - dy * pxScale));
+          const ta = CANVAS_W / botH, ia = image.width / image.height;
+          let sw, sh;
+          if (ia > ta) { sh = image.height / photoZoom; sw = sh * ta; }
+          else          { sw = image.width  / photoZoom; sh = sw / ta; }
+          setPan(clampPan(
+            ps.current.spx - dx * (sw / PW),
+            ps.current.spy - dy * (sh / botH_p),
+            photoZoom,
+          ));
         }
       };
 
