@@ -264,12 +264,40 @@
         a.click();
       }, [title]);
 
+      const [showAbout, setShowAbout] = useState(false);
+
       return (
         <div className="min-h-screen bg-stone-50" style={{ fontFamily: "'Courier Prime','Courier New',monospace" }}>
+
+          {showAbout && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/40"
+              onClick={() => setShowAbout(false)}>
+              <div className="bg-stone-50 max-w-lg w-full mx-6 p-10 shadow-xl relative"
+                onClick={e => e.stopPropagation()}>
+                <button onClick={() => setShowAbout(false)}
+                  className="absolute top-5 right-6 text-stone-400 hover:text-stone-700 text-xs tracking-widest transition-colors">
+                  CLOSE
+                </button>
+                <div className="flex flex-col gap-5 text-stone-600 text-sm leading-relaxed">
+                  <p>I'm a product designer who loves editing photos — and yes, I probably spend too much time on Xiaohongshu and Instagram.</p>
+                  <p>Color Diary came from a very real problem: I kept seeing those clean, split-style covers everywhere, tried making a few myself… and realized it was way more work than it should be.</p>
+                  <p>So I made a shortcut.</p>
+                  <p>Upload a photo, and it pulls the colors, builds the gradient, and lays everything out for you. You just drag, type, and export. Done.</p>
+                  <p>It's not trying to replace design tools — it's just here to make this one thing ridiculously easy (and a bit more fun).</p>
+                  <p>If you're into this kind of stuff, I'm probably posting more of it on Xiaohongshu and Instagram.</p>
+                </div>
+              </div>
+            </div>
+          )}
+
           <header className="border-b border-stone-200 px-12 py-2">
             <div className="max-w-6xl mx-auto flex items-center gap-3">
               <img src="logo%20(1).png" alt="Color Diary" style={{height:'40px',width:'auto'}} />
               <span className="text-sm text-stone-600">Color Diary</span>
+              <button onClick={() => setShowAbout(true)}
+                className="ml-auto text-xs text-stone-400 hover:text-stone-700 tracking-widest transition-colors">
+                ABOUT
+              </button>
             </div>
           </header>
 
