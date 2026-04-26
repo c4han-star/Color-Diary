@@ -259,12 +259,15 @@
         drawGradBlock(ctx, bgColor, 0, 0, CANVAS_W, topH, 38);
 
         if (image) {
-          const ia = image.width / image.height, ta = CANVAS_W / botH;
+          // videoWidth/videoHeight for <video>, naturalWidth for <img>
+          const iw = image.videoWidth  || image.naturalWidth  || image.width;
+          const ih = image.videoHeight || image.naturalHeight || image.height;
+          const ia = iw / ih, ta = CANVAS_W / botH;
           let sw, sh;
-          if (ia > ta) { sh = image.height / photoZoom; sw = sh * ta; }
-          else          { sw = image.width  / photoZoom; sh = sw / ta; }
-          const sx = Math.max(0, Math.min(image.width  - sw, (image.width  - sw) / 2 + pan.x));
-          const sy = Math.max(0, Math.min(image.height - sh, (image.height - sh) / 2 + pan.y));
+          if (ia > ta) { sh = ih / photoZoom; sw = sh * ta; }
+          else          { sw = iw / photoZoom; sh = sw / ta; }
+          const sx = Math.max(0, Math.min(iw - sw, (iw - sw) / 2 + pan.x));
+          const sy = Math.max(0, Math.min(ih - sh, (ih - sh) / 2 + pan.y));
           ctx.drawImage(image, sx, sy, sw, sh, 0, topH, CANVAS_W, botH);
         } else {
           ctx.fillStyle = '#b8afa6';
@@ -444,13 +447,15 @@
       // Clamp pan so photo never exposes empty space (both axes, zoom-aware)
       const clampPan = useCallback((nx, ny, zoom) => {
         if (!image) return { x: nx, y: ny };
+        const iw = image.videoWidth  || image.naturalWidth  || image.width;
+        const ih = image.videoHeight || image.naturalHeight || image.height;
         const botH = CANVAS_H - Math.round(CANVAS_H * split);
-        const ta = CANVAS_W / botH, ia = image.width / image.height;
+        const ta = CANVAS_W / botH, ia = iw / ih;
         let sw, sh;
-        if (ia > ta) { sh = image.height / zoom; sw = sh * ta; }
-        else          { sw = image.width  / zoom; sh = sw / ta; }
-        const maxX = (image.width  - sw) / 2;
-        const maxY = (image.height - sh) / 2;
+        if (ia > ta) { sh = ih / zoom; sw = sh * ta; }
+        else          { sw = iw / zoom; sh = sw / ta; }
+        const maxX = (iw - sw) / 2;
+        const maxY = (ih - sh) / 2;
         return {
           x: Math.max(-maxX, Math.min(maxX, nx)),
           y: Math.max(-maxY, Math.min(maxY, ny)),
@@ -503,12 +508,14 @@
           const dmx = newMidX - lastPinch.current.prevMidX;
           const dmy = newMidY - lastPinch.current.prevMidY;
           if (image && (Math.abs(dmx) > 0.3 || Math.abs(dmy) > 0.3)) {
+            const iw = image.videoWidth  || image.naturalWidth  || image.width;
+            const ih = image.videoHeight || image.naturalHeight || image.height;
             const botH = CANVAS_H - Math.round(CANVAS_H * split);
             const botH_p = PH - Math.round(PH * split);
-            const ta = CANVAS_W / botH, ia = image.width / image.height;
+            const ta = CANVAS_W / botH, ia = iw / ih;
             let sw, sh;
-            if (ia > ta) { sh = image.height / newZoom; sw = sh * ta; }
-            else          { sw = image.width  / newZoom; sh = sw / ta; }
+            if (ia > ta) { sh = ih / newZoom; sw = sh * ta; }
+            else          { sw = iw / newZoom; sh = sw / ta; }
             setPan(prev => clampPan(
               prev.x - dmx * (sw / PW),
               prev.y - dmy * (sh / botH_p),
@@ -525,12 +532,14 @@
         if (Math.hypot(dx, dy) > 8) ps.current.moved = true;
 
         if (e.pointerType === 'mouse' && ps.current.dragActive && image) {
+          const iw = image.videoWidth  || image.naturalWidth  || image.width;
+          const ih = image.videoHeight || image.naturalHeight || image.height;
           const botH = CANVAS_H - Math.round(CANVAS_H * split);
           const botH_p = PH - Math.round(PH * split);
-          const ta = CANVAS_W / botH, ia = image.width / image.height;
+          const ta = CANVAS_W / botH, ia = iw / ih;
           let sw, sh;
-          if (ia > ta) { sh = image.height / photoZoom; sw = sh * ta; }
-          else          { sw = image.width  / photoZoom; sh = sw / ta; }
+          if (ia > ta) { sh = ih / photoZoom; sw = sh * ta; }
+          else          { sw = iw / photoZoom; sh = sw / ta; }
           setPan(clampPan(
             ps.current.spx - dx * (sw / PW),
             ps.current.spy - dy * (sh / botH_p),
