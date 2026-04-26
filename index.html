@@ -221,11 +221,14 @@
       const [dragReady, setDragReady] = useState(false);
       const [activeTab, setActiveTab] = useState('photo');
       const [savedImgUrl, setSavedImgUrl] = useState(null);
+      const [zoom, setZoom] = useState(1);
 
       const canvasRef = useRef(null), fileRef = useRef(null), wrapRef = useRef(null);
       const ps = useRef({ on: false, sx: 0, sy: 0, spx: 0, spy: 0, moved: false, inImg: false, dragActive: false });
       const animRef = useRef(null);
       const longPressTimer = useRef(null);
+      const touches = useRef({});
+      const lastPinch = useRef(null);
 
       const [viewW, setViewW] = useState(window.innerWidth);
       useEffect(() => {
@@ -249,16 +252,14 @@
 
         if (image) {
           const ia = image.width / image.height, ta = CANVAS_W / botH;
-          let sx, sy, sw, sh;
-          if (ia > ta) {
-            sh = image.height; sw = sh * ta;
-            sx = Math.max(0, Math.min(image.width - sw, (image.width - sw) / 2 + pan.x));
-            sy = 0;
-          } else {
-            sw = image.width; sh = sw / ta;
-            sx = 0;
-            sy = Math.max(0, Math.min(image.height - sh, (image.height - sh) / 2 + pan.y));
-          }
+          let swBase, shBase;
+          if (ia > ta) { shBase = image.height; swBase = shBase * ta; }
+          else          { swBase = image.width;  shBase = swBase / ta; }
+          const sw = swBase / zoom, sh = shBase / zoom;
+          const cx = image.width  / 2 + pan.x;
+          const cy = image.height / 2 + pan.y;
+          const sx = Math.max(0, Math.min(image.width  - sw, cx - sw / 2));
+          const sy = Math.max(0, Math.min(image.height - sh, cy - sh / 2));
           ctx.drawImage(image, sx, sy, sw, sh, 0, topH, CANVAS_W, botH);
         } else {
           ctx.fillStyle = '#b8afa6';
@@ -290,7 +291,7 @@
           ctx.globalAlpha = 1;
           if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
         }
-      }, [image, bgColor, title, split, fontSize, pan, dateText, lang]);
+      }, [image, bgColor, title, split, fontSize, pan, dateText, lang, zoom]);
 
       useEffect(() => { draw(); }, [draw, fontsReady]);
 
@@ -299,7 +300,7 @@
         const url = URL.createObjectURL(file);
 
         const afterLoad = async (el, type) => {
-          setImage(el); setSourceType(type); setPan({ x: 0, y: 0 });
+          setImage(el); setSourceType(type); setPan({ x: 0, y: 0 }); setZoom(1);
           clearTimeout(hintTimer.current);
           setShowPanHint(true);
           hintTimer.current = setTimeout(() => setShowPanHint(false), 2500);
@@ -416,50 +417,84 @@
       }, [image, sourceType, isExporting, title]);
 
       const onPointerDown = (e) => {
-        if (e.button !== 0) return;
-        const rect = wrapRef.current.getBoundingClientRect();
-        const yRel = (e.clientY - rect.top) / rect.height;
-        const inImg = yRel >= split && !!image;
-        clearTimeout(longPressTimer.current);
-        ps.current = { on: true, sx: e.clientX, sy: e.clientY, spx: pan.x, spy: pan.y, moved: false, inImg, dragActive: false };
-        if (inImg) {
-          if (e.pointerType === 'touch') {
-            longPressTimer.current = setTimeout(() => {
+        if (e.button !== 0 && e.pointerType === 'mouse') return;
+        touches.current[e.pointerId] = { x: e.clientX, y: e.clientY };
+        const n = Object.keys(touches.current).length;
+
+        if (n === 1) {
+          const rect = wrapRef.current.getBoundingClientRect();
+          const yRel = (e.clientY - rect.top) / rect.height;
+          const inImg = yRel >= split && !!image;
+          clearTimeout(longPressTimer.current);
+          ps.current = { on: true, sx: e.clientX, sy: e.clientY, spx: pan.x, spy: pan.y, moved: false, inImg, dragActive: false };
+          if (inImg) {
+            if (e.pointerType === 'touch') {
+              longPressTimer.current = setTimeout(() => {
+                ps.current.dragActive = true;
+                setDragReady(true);
+                setTimeout(() => setDragReady(false), 700);
+                try { navigator.vibrate?.(40); } catch(_) {}
+              }, 400);
+            } else {
               ps.current.dragActive = true;
-              setDragReady(true);
-              setTimeout(() => setDragReady(false), 700);
-              try { navigator.vibrate?.(40); } catch(_) {}
-            }, 400);
-          } else {
-            ps.current.dragActive = true;
-            e.preventDefault();
+              e.preventDefault();
+            }
           }
+        } else if (n === 2) {
+          clearTimeout(longPressTimer.current);
+          ps.current.on = false;
+          const pts = Object.values(touches.current);
+          lastPinch.current = {
+            dist: Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y),
+            startZoom: zoom,
+          };
         }
       };
 
       const onPointerMove = (e) => {
+        if (!(e.pointerId in touches.current)) return;
+        touches.current[e.pointerId] = { x: e.clientX, y: e.clientY };
+        const n = Object.keys(touches.current).length;
+
+        if (n === 2 && lastPinch.current && image) {
+          const pts = Object.values(touches.current);
+          const dist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
+          setZoom(Math.max(1, Math.min(8, lastPinch.current.startZoom * dist / lastPinch.current.dist)));
+          return;
+        }
+
         if (!ps.current.on) return;
         const dx = e.clientX - ps.current.sx, dy = e.clientY - ps.current.sy;
         const dist = Math.hypot(dx, dy);
         if (dist > 4) ps.current.moved = true;
         if (dist > 12 && !ps.current.dragActive) {
-          clearTimeout(longPressTimer.current);
-          ps.current.on = false;
-          return;
+          clearTimeout(longPressTimer.current); ps.current.on = false; return;
         }
         if (!ps.current.dragActive || !ps.current.inImg) return;
         const botH = CANVAS_H - Math.round(CANVAS_H * split);
         const botH_p = PH - Math.round(PH * split);
         const ia = image.width / image.height, ta = CANVAS_W / botH;
-        const scale = ia > ta ? image.height / botH_p : image.width / PW;
-        setPan({ x: ps.current.spx - dx * scale, y: ps.current.spy - dy * scale });
+        const baseScale = ia > ta ? image.height / botH_p : image.width / PW;
+        setPan({ x: ps.current.spx - dx * baseScale / zoom, y: ps.current.spy - dy * baseScale / zoom });
       };
 
-      const onPointerUp = () => {
-        if (!ps.current.on) return;
-        clearTimeout(longPressTimer.current);
-        ps.current.on = false;
-        if (!ps.current.moved && !ps.current.dragActive) fileRef.current?.click();
+      const onPointerUp = (e) => {
+        delete touches.current[e.pointerId];
+        const n = Object.keys(touches.current).length;
+        if (n < 2) lastPinch.current = null;
+        if (n === 0) {
+          clearTimeout(longPressTimer.current);
+          if (!ps.current.moved && !ps.current.dragActive) fileRef.current?.click();
+          ps.current.on = false;
+        }
+      };
+
+      const onPointerCancel = (e) => {
+        delete touches.current[e.pointerId];
+        if (Object.keys(touches.current).length === 0) {
+          clearTimeout(longPressTimer.current);
+          ps.current.on = false; lastPinch.current = null;
+        }
       };
 
       const exportPng = useCallback(() => {
@@ -561,7 +596,8 @@
                 className={`relative overflow-hidden select-none ${image ? 'cursor-grab' : 'cursor-pointer'} ${dropHover ? 'ring-1 ring-stone-400' : ''} ${!isMobile ? 'shadow-sm' : ''}`}
                 style={{ width: PW, height: PH, background: '#e7e3de', touchAction: 'none' }}
                 onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp}
-                onPointerLeave={() => { clearTimeout(longPressTimer.current); ps.current.on = false; }}
+                onPointerLeave={onPointerCancel}
+                onPointerCancel={onPointerCancel}
                 onDrop={e => { e.preventDefault(); setDropHover(false); load(e.dataTransfer.files[0]); }}
                 onDragOver={e => { e.preventDefault(); setDropHover(true); }}
                 onDragLeave={() => setDropHover(false)}>
