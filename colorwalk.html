@@ -54,7 +54,9 @@
         uploadPrompt: 'UPLOAD A PHOTO OR VIDEO',
         captionEmpty: `${CANVAS_W} × ${CANVAS_H} · CLICK OR DRAG TO UPLOAD`,
         captionImage: 'DRAG TO REPOSITION · CLICK TO REPLACE',
-        dragHint: 'DRAG TO REPOSITION', dropImage: 'DROP FILE',
+        dragHint: 'DRAG TO REPOSITION', dragHintTouch: 'HOLD & DRAG TO REPOSITION',
+        captionImageTouch: 'HOLD & DRAG · TAP TO REPLACE',
+        dropImage: 'DROP FILE',
         aboutText: [
           "I'm a product designer who loves editing photos — and yes, I probably spend too much time on Xiaohongshu and Instagram.",
           "Color Diary came from a very real problem: I kept seeing those clean, split-style covers everywhere, tried making a few myself… and realized it was way more work than it should be.",
@@ -77,7 +79,9 @@
         uploadPrompt: '上传照片或视频',
         captionEmpty: `${CANVAS_W} × ${CANVAS_H} · 点击或拖拽上传`,
         captionImage: '拖拽调整位置 · 点击重新上传',
-        dragHint: '拖拽调整位置', dropImage: '松开上传',
+        dragHint: '拖拽调整位置', dragHintTouch: '长按拖拽调整位置',
+        captionImageTouch: '长按拖拽 · 点击换图',
+        dropImage: '松开上传',
         aboutText: [
           "我是个很爱修图的产品设计师（也确实在小红书和 IG 上待太久了）。",
           "最近 color walk 真的太火了。\n那种一半颜色一半照片的封面，看着像「随便做做就有了」。",
@@ -212,9 +216,12 @@
       const [dropHover, setDropHover] = useState(false);
       const [fontsReady, setFontsReady] = useState(false);
 
+      const [dragReady, setDragReady] = useState(false);
+
       const canvasRef = useRef(null), fileRef = useRef(null), wrapRef = useRef(null);
-      const ps = useRef({ on: false, sx: 0, sy: 0, spx: 0, spy: 0, moved: false, inImg: false });
+      const ps = useRef({ on: false, sx: 0, sy: 0, spx: 0, spy: 0, moved: false, inImg: false, dragActive: false });
       const animRef = useRef(null);
+      const longPressTimer = useRef(null);
 
       const [viewW, setViewW] = useState(window.innerWidth);
       useEffect(() => {
@@ -409,15 +416,34 @@
         const rect = wrapRef.current.getBoundingClientRect();
         const yRel = (e.clientY - rect.top) / rect.height;
         const inImg = yRel >= split && !!image;
-        ps.current = { on: true, sx: e.clientX, sy: e.clientY, spx: pan.x, spy: pan.y, moved: false, inImg };
-        if (inImg) e.preventDefault();
+        clearTimeout(longPressTimer.current);
+        ps.current = { on: true, sx: e.clientX, sy: e.clientY, spx: pan.x, spy: pan.y, moved: false, inImg, dragActive: false };
+        if (inImg) {
+          if (e.pointerType === 'touch') {
+            longPressTimer.current = setTimeout(() => {
+              ps.current.dragActive = true;
+              setDragReady(true);
+              setTimeout(() => setDragReady(false), 700);
+              try { navigator.vibrate?.(40); } catch(_) {}
+            }, 400);
+          } else {
+            ps.current.dragActive = true;
+            e.preventDefault();
+          }
+        }
       };
 
       const onPointerMove = (e) => {
         if (!ps.current.on) return;
         const dx = e.clientX - ps.current.sx, dy = e.clientY - ps.current.sy;
-        if (Math.hypot(dx, dy) > 4) ps.current.moved = true;
-        if (!ps.current.moved || !ps.current.inImg) return;
+        const dist = Math.hypot(dx, dy);
+        if (dist > 4) ps.current.moved = true;
+        if (dist > 12 && !ps.current.dragActive) {
+          clearTimeout(longPressTimer.current);
+          ps.current.on = false;
+          return;
+        }
+        if (!ps.current.dragActive || !ps.current.inImg) return;
         const botH = CANVAS_H - Math.round(CANVAS_H * split);
         const botH_p = PH - Math.round(PH * split);
         const ia = image.width / image.height, ta = CANVAS_W / botH;
@@ -427,8 +453,9 @@
 
       const onPointerUp = () => {
         if (!ps.current.on) return;
+        clearTimeout(longPressTimer.current);
         ps.current.on = false;
-        if (!ps.current.moved) fileRef.current?.click();
+        if (!ps.current.moved && !ps.current.dragActive) fileRef.current?.click();
       };
 
       const exportPng = useCallback(() => {
@@ -482,15 +509,15 @@
             </div>
           </header>
 
-          <main className="max-w-6xl mx-auto px-4 sm:px-12 pt-8 sm:pt-14 pb-8 flex flex-col sm:flex-row gap-8 sm:gap-12 items-start">
+          <main className="max-w-6xl mx-auto px-4 sm:px-12 pt-8 sm:pt-14 pb-28 sm:pb-8 flex flex-col sm:flex-row gap-8 sm:gap-12 items-start">
             <div className="w-full sm:w-auto sm:flex-shrink-0 flex flex-col items-center gap-3">
               <div ref={wrapRef}
                 className={`relative overflow-hidden select-none ${image ? 'cursor-grab' : 'cursor-pointer'} ${dropHover ? 'shadow-lg ring-1 ring-stone-400' : 'shadow-sm'}`}
-                style={{ width: PW, height: PH, background: '#e7e3de' }}
+                style={{ width: PW, height: PH, background: '#e7e3de', touchAction: 'none' }}
                 onPointerDown={onPointerDown}
                 onPointerMove={onPointerMove}
                 onPointerUp={onPointerUp}
-                onPointerLeave={() => { ps.current.on = false; }}
+                onPointerLeave={() => { clearTimeout(longPressTimer.current); ps.current.on = false; }}
                 onDrop={e => { e.preventDefault(); setDropHover(false); load(e.dataTransfer.files[0]); }}
                 onDragOver={e => { e.preventDefault(); setDropHover(true); }}
                 onDragLeave={() => setDropHover(false)}>
@@ -501,9 +528,13 @@
                     style={{ paddingBottom: `${Math.round(PH * 0.28)}px` }}>
                     <div className="bg-stone-900/60 text-white text-xs px-4 py-2 tracking-widest"
                       style={{ letterSpacing: '0.12em' }}>
-                      {t.dragHint}
+                      {isMobile ? t.dragHintTouch : t.dragHint}
                     </div>
                   </div>
+                )}
+                {dragReady && (
+                  <div className="absolute inset-0 pointer-events-none"
+                    style={{ boxShadow: 'inset 0 0 0 3px rgba(255,255,255,0.6)' }} />
                 )}
                 {dropHover && (
                   <div className="absolute inset-0 flex items-center justify-center bg-stone-900/20">
@@ -512,7 +543,7 @@
                 )}
               </div>
               <p className="text-xs text-stone-400" style={{ letterSpacing: '0.1em' }}>
-                {image ? t.captionImage : t.captionEmpty}
+                {image ? (isMobile ? t.captionImageTouch : t.captionImage) : t.captionEmpty}
               </p>
             </div>
 
@@ -568,19 +599,35 @@
                 />
               </Section>
 
-              <div className="pt-3 sm:mt-auto border-t border-stone-200 pb-6 sm:pb-0">
-                <button
-                  onClick={sourceType === 'video' ? exportVideo : exportPng}
-                  disabled={isExporting}
-                  className="w-full py-3 bg-stone-800 text-stone-50 text-xs tracking-widest hover:bg-stone-900 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                  {isExporting ? t.recording : sourceType === 'video' ? t.exportVideoBtn : t.exportBtn}
-                </button>
-                <p className="text-xs text-stone-400 text-center mt-1.5">
-                  {sourceType === 'video' ? t.exportVideoNote : t.exportNote}
-                </p>
-              </div>
+              {!isMobile && (
+                <div className="pt-3 mt-auto border-t border-stone-200">
+                  <button
+                    onClick={sourceType === 'video' ? exportVideo : exportPng}
+                    disabled={isExporting}
+                    className="w-full py-3 bg-stone-800 text-stone-50 text-xs tracking-widest hover:bg-stone-900 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                    {isExporting ? t.recording : sourceType === 'video' ? t.exportVideoBtn : t.exportBtn}
+                  </button>
+                  <p className="text-xs text-stone-400 text-center mt-1.5">
+                    {sourceType === 'video' ? t.exportVideoNote : t.exportNote}
+                  </p>
+                </div>
+              )}
             </div>
           </main>
+
+          {isMobile && (
+            <div className="fixed bottom-0 inset-x-0 z-40 bg-stone-50 border-t border-stone-200 px-4 py-3">
+              <button
+                onClick={sourceType === 'video' ? exportVideo : exportPng}
+                disabled={isExporting}
+                className="w-full py-3 bg-stone-800 text-stone-50 text-xs tracking-widest hover:bg-stone-900 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                {isExporting ? t.recording : sourceType === 'video' ? t.exportVideoBtn : t.exportBtn}
+              </button>
+              <p className="text-xs text-stone-400 text-center mt-1.5">
+                {sourceType === 'video' ? t.exportVideoNote : t.exportNote}
+              </p>
+            </div>
+          )}
         </div>
       );
     }
