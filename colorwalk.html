@@ -37,16 +37,18 @@
     const T = {
       en: {
         about: 'ABOUT', close: 'CLOSE',
-        photo: 'Photo', upload: 'UPLOAD PHOTO', replace: 'REPLACE PHOTO',
+        photo: 'Photo', upload: 'UPLOAD PHOTO / VIDEO', replace: 'REPLACE',
         title: 'Title', titlePh: 'ENTER TITLE...',
         date: 'Date', datePh: 'leave empty to hide', reset: 'RESET',
         split: 'Split ratio', fontSize: 'Font size', bgColor: 'Background color',
         fromPhoto: 'from photo', autoExtracted: 'auto-extracted', random: '↻ RANDOM',
         exportBtn: 'EXPORT AS PNG', exportNote: `exports at ${CANVAS_W} × ${CANVAS_H}px`,
-        uploadPrompt: 'UPLOAD A PHOTO',
+        exportVideoBtn: 'EXPORT AS VIDEO', exportVideoNote: 'records up to 5 sec · exports as .webm',
+        recording: 'RECORDING…',
+        uploadPrompt: 'UPLOAD A PHOTO OR VIDEO',
         captionEmpty: `${CANVAS_W} × ${CANVAS_H} · CLICK OR DRAG TO UPLOAD`,
-        captionImage: 'DRAG PHOTO TO REPOSITION · CLICK TO REPLACE',
-        dragHint: 'DRAG PHOTO TO REPOSITION', dropImage: 'DROP IMAGE',
+        captionImage: 'DRAG TO REPOSITION · CLICK TO REPLACE',
+        dragHint: 'DRAG TO REPOSITION', dropImage: 'DROP FILE',
         aboutText: [
           "I'm a product designer who loves editing photos — and yes, I probably spend too much time on Xiaohongshu and Instagram.",
           "Color Diary came from a very real problem: I kept seeing those clean, split-style covers everywhere, tried making a few myself… and realized it was way more work than it should be.",
@@ -58,16 +60,18 @@
       },
       cn: {
         about: '关于', close: '关闭',
-        photo: '照片', upload: '上传照片', replace: '更换照片',
+        photo: '照片 / 视频', upload: '上传照片 / 视频', replace: '重新上传',
         title: '标题', titlePh: '输入标题…',
         date: '日期', datePh: '留空则不显示', reset: '重置',
         split: '分割比例', fontSize: '字体大小', bgColor: '背景颜色',
         fromPhoto: '来自照片', autoExtracted: '自动提取', random: '↻ 随机',
         exportBtn: '导出 PNG', exportNote: `导出尺寸 ${CANVAS_W} × ${CANVAS_H}px`,
-        uploadPrompt: '上传一张照片',
+        exportVideoBtn: '导出视频', exportVideoNote: '最长录制 5 秒 · 导出为 .webm',
+        recording: '录制中…',
+        uploadPrompt: '上传照片或视频',
         captionEmpty: `${CANVAS_W} × ${CANVAS_H} · 点击或拖拽上传`,
-        captionImage: '拖拽调整位置 · 点击更换照片',
-        dragHint: '拖拽调整照片位置', dropImage: '松开上传',
+        captionImage: '拖拽调整位置 · 点击重新上传',
+        dragHint: '拖拽调整位置', dropImage: '松开上传',
         aboutText: [
           "我是个很爱修图的产品设计师（也确实在小红书和 IG 上待太久了）。",
           "最近 color walk 真的太火了。\n那种一半颜色一半照片的封面，看着像「随便做做就有了」。",
@@ -195,6 +199,8 @@
       const [palette, setPalette]     = useState([]);
       const [pan, setPan]             = useState({ x: 0, y: 0 });
       const [dateText, setDateText]   = useState(AUTO_DATE_EN);
+      const [sourceType, setSourceType] = useState(null);
+      const [isExporting, setIsExporting] = useState(false);
       const [showPanHint, setShowPanHint] = useState(false);
       const hintTimer = useRef(null);
       const [dropHover, setDropHover] = useState(false);
@@ -202,6 +208,7 @@
 
       const canvasRef = useRef(null), fileRef = useRef(null), wrapRef = useRef(null);
       const ps = useRef({ on: false, sx: 0, sy: 0, spx: 0, spy: 0, moved: false, inImg: false });
+      const animRef = useRef(null);
 
       const [viewW, setViewW] = useState(window.innerWidth);
       useEffect(() => {
@@ -271,16 +278,22 @@
       useEffect(() => { draw(); }, [draw, fontsReady]);
 
       const load = useCallback(async (file) => {
-        if (!file || !file.type.startsWith('image/')) return;
+        if (!file) return;
         const url = URL.createObjectURL(file);
-        const img = new Image();
-        img.onload = async () => {
-          setImage(img); setPan({ x: 0, y: 0 });
+
+        const afterLoad = async (el, type) => {
+          setImage(el); setSourceType(type); setPan({ x: 0, y: 0 });
           clearTimeout(hintTimer.current);
           setShowPanHint(true);
           hintTimer.current = setTimeout(() => setShowPanHint(false), 2500);
           try {
-            const p = await Vibrant.from(url).getPalette();
+            let src = type === 'video' ? (() => {
+              const tmp = document.createElement('canvas');
+              tmp.width = 200; tmp.height = 200;
+              tmp.getContext('2d').drawImage(el, 0, 0, 200, 200);
+              return tmp;
+            })() : url;
+            const p = await Vibrant.from(src).getPalette();
             const keys = ['Vibrant','LightVibrant','DarkVibrant','Muted','LightMuted','DarkMuted'];
             const colors = keys.map(k => p[k]?.hex).filter(Boolean);
             setPalette(colors);
@@ -288,13 +301,57 @@
             if (v) setBgColor(v.hex);
           } catch (e) {}
         };
-        img.src = url;
+
+        if (file.type.startsWith('image/')) {
+          const img = new Image();
+          img.onload = () => afterLoad(img, 'image');
+          img.src = url;
+        } else if (file.type.startsWith('video/')) {
+          const vid = document.createElement('video');
+          vid.muted = true; vid.loop = true; vid.playsInline = true;
+          vid.addEventListener('loadeddata', () => afterLoad(vid, 'video'), { once: true });
+          vid.src = url;
+          vid.load();
+        }
       }, []);
 
       const randomFromPalette = useCallback(() => {
         if (palette.length === 0) return;
         setBgColor(palette[Math.floor(Math.random() * palette.length)]);
       }, [palette]);
+
+      useEffect(() => {
+        cancelAnimationFrame(animRef.current);
+        if (sourceType !== 'video' || !image) return;
+        image.play().catch(() => {});
+        const tick = () => { draw(); animRef.current = requestAnimationFrame(tick); };
+        animRef.current = requestAnimationFrame(tick);
+        return () => cancelAnimationFrame(animRef.current);
+      }, [sourceType, image, draw]);
+
+      const exportVideo = useCallback(() => {
+        if (!image || sourceType !== 'video' || isExporting) return;
+        setIsExporting(true);
+        image.currentTime = 0;
+        image.play().catch(() => {});
+        const duration = Math.min(image.duration || 5, 5) * 1000;
+        const stream = canvasRef.current.captureStream(30);
+        const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
+          ? 'video/webm;codecs=vp9' : 'video/webm';
+        const recorder = new MediaRecorder(stream, { mimeType });
+        const chunks = [];
+        recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+        recorder.onstop = () => {
+          const blob = new Blob(chunks, { type: 'video/webm' });
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = (title || 'cover').trim().replace(/\s+/g, '-').toLowerCase() + '.webm';
+          a.click();
+          setIsExporting(false);
+        };
+        recorder.start();
+        setTimeout(() => recorder.stop(), duration);
+      }, [image, sourceType, isExporting, title]);
 
       const onPointerDown = (e) => {
         if (e.button !== 0) return;
@@ -415,7 +472,7 @@
                   className="w-full py-2 border border-stone-300 text-stone-600 text-xs hover:border-stone-500 hover:text-stone-800 transition-colors tracking-widest">
                   {image ? t.replace : t.upload}
                 </button>
-                <input ref={fileRef} type="file" accept="image/*" className="hidden"
+                <input ref={fileRef} type="file" accept="image/*,video/*" className="hidden"
                   onChange={e => load(e.target.files[0])} />
               </Section>
 
@@ -461,11 +518,15 @@
               </Section>
 
               <div className="pt-3 sm:mt-auto border-t border-stone-200 pb-6 sm:pb-0">
-                <button onClick={exportPng}
-                  className="w-full py-3 bg-stone-800 text-stone-50 text-xs tracking-widest hover:bg-stone-900 transition-colors">
-                  {t.exportBtn}
+                <button
+                  onClick={sourceType === 'video' ? exportVideo : exportPng}
+                  disabled={isExporting}
+                  className="w-full py-3 bg-stone-800 text-stone-50 text-xs tracking-widest hover:bg-stone-900 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                  {isExporting ? t.recording : sourceType === 'video' ? t.exportVideoBtn : t.exportBtn}
                 </button>
-                <p className="text-xs text-stone-400 text-center mt-1.5">{t.exportNote}</p>
+                <p className="text-xs text-stone-400 text-center mt-1.5">
+                  {sourceType === 'video' ? t.exportVideoNote : t.exportNote}
+                </p>
               </div>
             </div>
           </main>
