@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Colorwalk — Cover Generator</title>
+  <title>Color Diary — Cover Generator</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet" />
@@ -48,20 +48,6 @@
       } catch { return '#1c1917'; }
     }
 
-    function hslToHex(h, s, l) {
-      s /= 100; l /= 100;
-      const a = s * Math.min(l, 1 - l);
-      const f = n => {
-        const k = (n + h / 30) % 12;
-        return Math.round(255 * (l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1))).toString(16).padStart(2, '0');
-      };
-      return `#${f(0)}${f(8)}${f(4)}`;
-    }
-
-    function randomNiceColor() {
-      return hslToHex(Math.random() * 360, 22 + Math.random() * 28, 52 + Math.random() * 22);
-    }
-
     function measureLines(ctx, text, maxW) {
       if (!text.trim()) return [];
       const words = text.split(' '); let line = '', lines = [];
@@ -100,7 +86,7 @@
       addGrain(ctx, x, y, w, h, grain);
     }
 
-    function ColorPicker({ color, onChange, label }) {
+    function ColorPicker({ color, onChange, onRandom, label }) {
       return (
         <div className="flex items-center gap-3">
           <div className="relative w-10 h-7 border border-stone-300 overflow-hidden flex-shrink-0">
@@ -111,10 +97,12 @@
           </div>
           <span className="text-xs text-stone-600 font-mono tracking-widest">{color.toUpperCase()}</span>
           {label && <span className="text-xs text-stone-400">{label}</span>}
-          <button onClick={() => onChange(randomNiceColor())}
-            className="ml-auto text-xs text-stone-400 hover:text-stone-800 transition-colors tracking-widest">
-            ↻ RANDOM
-          </button>
+          {onRandom && (
+            <button onClick={onRandom}
+              className="ml-auto text-xs text-stone-400 hover:text-stone-800 transition-colors tracking-widest">
+              ↻ RANDOM
+            </button>
+          )}
         </div>
       );
     }
@@ -137,8 +125,8 @@
       const [split, setSplit]         = useState(0.44);
       const [fontSize, setFontSize]   = useState(26);
       const [bgColor, setBgColor]     = useState('#c9bba8');
-      const [botColor, setBotColor]   = useState('#7a8c8d');
-      const [botMode, setBotMode]     = useState('photo'); // 'photo' | 'color'
+      const [dateColor, setDateColor] = useState('#1c1917');
+      const [palette, setPalette]     = useState([]);
       const [pan, setPan]             = useState({ x: 0, y: 0 });
       const [dateText, setDateText]   = useState(AUTO_DATE);
       const [dropHover, setDropHover] = useState(false);
@@ -158,7 +146,7 @@
 
         drawGradBlock(ctx, bgColor, 0, 0, CANVAS_W, topH, 38);
 
-        if (botMode === 'photo' && image) {
+        if (image) {
           const ia = image.width / image.height, ta = CANVAS_W / botH;
           let sx, sy, sw, sh;
           if (ia > ta) {
@@ -172,14 +160,12 @@
           }
           ctx.drawImage(image, sx, sy, sw, sh, 0, topH, CANVAS_W, botH);
         } else {
-          const c = botMode === 'color' ? botColor : '#b8afa6';
-          drawGradBlock(ctx, c, 0, topH, CANVAS_W, botH, 30);
-          if (botMode === 'photo' && !image) {
-            ctx.fillStyle = 'rgba(250,249,247,0.3)';
-            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-            ctx.font = '24px "Courier Prime","Courier New",monospace';
-            ctx.fillText('UPLOAD A PHOTO', CANVAS_W / 2, topH + botH / 2);
-          }
+          ctx.fillStyle = '#b8afa6';
+          ctx.fillRect(0, topH, CANVAS_W, botH);
+          ctx.fillStyle = 'rgba(250,249,247,0.3)';
+          ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+          ctx.font = '24px "Courier Prime","Courier New",monospace';
+          ctx.fillText('UPLOAD A PHOTO', CANVAS_W / 2, topH + botH / 2);
         }
 
         const tc = getTextColor(bgColor);
@@ -196,11 +182,12 @@
 
         ctx.font = `400 ${Math.max(14, Math.round(fontSize * 0.7))}px "Courier Prime","Courier New",monospace`;
         if ('letterSpacing' in ctx) ctx.letterSpacing = '4px';
+        ctx.fillStyle = dateColor;
         ctx.globalAlpha = 0.55;
         ctx.fillText(dateText || AUTO_DATE, CANVAS_W / 2, ry + 28);
         ctx.globalAlpha = 1;
         if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
-      }, [image, bgColor, botColor, botMode, title, split, fontSize, pan, dateText]);
+      }, [image, bgColor, dateColor, title, split, fontSize, pan, dateText]);
 
       useEffect(() => { draw(); }, [draw, fontsReady]);
 
@@ -209,23 +196,29 @@
         const url = URL.createObjectURL(file);
         const img = new Image();
         img.onload = async () => {
-          setImage(img); setPan({ x: 0, y: 0 }); setBotMode('photo');
+          setImage(img); setPan({ x: 0, y: 0 });
           try {
             const p = await Vibrant.from(url).getPalette();
+            const keys = ['Vibrant','LightVibrant','DarkVibrant','Muted','LightMuted','DarkMuted'];
+            const colors = keys.map(k => p[k]?.hex).filter(Boolean);
+            setPalette(colors);
             const v = p.Vibrant ?? p.LightVibrant ?? p.Muted;
             if (v) setBgColor(v.hex);
-            const d = p.DarkVibrant ?? p.DarkMuted ?? p.Muted;
-            if (d) setBotColor(d.hex);
           } catch (e) {}
         };
         img.src = url;
       }, []);
 
+      const randomFromPalette = useCallback(() => {
+        if (palette.length === 0) return;
+        setBgColor(palette[Math.floor(Math.random() * palette.length)]);
+      }, [palette]);
+
       const onPointerDown = (e) => {
         if (e.button !== 0) return;
         const rect = wrapRef.current.getBoundingClientRect();
         const yRel = (e.clientY - rect.top) / PH;
-        const inImg = yRel >= split && !!image && botMode === 'photo';
+        const inImg = yRel >= split && !!image;
         ps.current = { on: true, sx: e.clientX, sy: e.clientY, spx: pan.x, spy: pan.y, moved: false, inImg };
         if (inImg) e.preventDefault();
       };
@@ -255,13 +248,11 @@
         a.click();
       }, [title]);
 
-      const canPan = !!image && botMode === 'photo';
-
       return (
         <div className="min-h-screen bg-stone-50" style={{ fontFamily: "'Courier Prime','Courier New',monospace" }}>
           <header className="border-b border-stone-200 px-10 py-5">
             <div className="max-w-5xl mx-auto flex items-baseline gap-4">
-              <span className="text-sm text-stone-800 tracking-widest">COLORWALK</span>
+              <span className="text-sm text-stone-800 tracking-widest">COLOR DIARY</span>
               <span className="text-xs text-stone-400">/ cover generator</span>
             </div>
           </header>
@@ -269,7 +260,7 @@
           <main className="max-w-5xl mx-auto px-10 py-14 flex gap-14 items-start">
             <div className="flex-shrink-0 flex flex-col items-center gap-3">
               <div ref={wrapRef}
-                className={`relative overflow-hidden select-none ${canPan ? 'cursor-grab' : 'cursor-pointer'} ${dropHover ? 'shadow-lg ring-1 ring-stone-400' : 'shadow-sm'}`}
+                className={`relative overflow-hidden select-none ${image ? 'cursor-grab' : 'cursor-pointer'} ${dropHover ? 'shadow-lg ring-1 ring-stone-400' : 'shadow-sm'}`}
                 style={{ width: PW, height: PH, background: '#e7e3de' }}
                 onPointerDown={onPointerDown}
                 onPointerMove={onPointerMove}
@@ -280,7 +271,7 @@
                 onDragLeave={() => setDropHover(false)}>
                 <canvas ref={canvasRef} width={CANVAS_W} height={CANVAS_H}
                   style={{ width: '100%', height: '100%', display: 'block' }} />
-                {canPan && (
+                {image && (
                   <div className="absolute bottom-2 right-2 text-white/40 text-xs pointer-events-none"
                     style={{ letterSpacing: '0.1em' }}>DRAG TO PAN</div>
                 )}
@@ -306,23 +297,6 @@
                   onChange={e => load(e.target.files[0])} />
               </Section>
 
-              <Section label="Bottom section">
-                <div className="flex gap-2">
-                  {['photo', 'color'].map(m => (
-                    <button key={m} onClick={() => setBotMode(m)}
-                      className={`flex-1 py-2 text-xs tracking-widest border transition-colors
-                        ${botMode === m ? 'border-stone-700 bg-stone-800 text-stone-50' : 'border-stone-300 text-stone-500 hover:border-stone-500'}`}>
-                      {m === 'photo' ? 'PHOTO' : 'COLOR'}
-                    </button>
-                  ))}
-                </div>
-                {botMode === 'color' && (
-                  <div className="mt-3">
-                    <ColorPicker color={botColor} onChange={setBotColor} />
-                  </div>
-                )}
-              </Section>
-
               <Section label="Title">
                 <input type="text" value={title} onChange={e => setTitle(e.target.value)}
                   className="w-full border-b border-stone-200 focus:border-stone-600 outline-none py-1.5 text-stone-800 text-sm bg-transparent transition-colors tracking-widest"
@@ -331,7 +305,7 @@
               </Section>
 
               <Section label="Date">
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 mb-3">
                   <input type="text" value={dateText} onChange={e => setDateText(e.target.value)}
                     className="flex-1 border-b border-stone-200 focus:border-stone-600 outline-none py-1.5 text-stone-600 text-xs bg-transparent transition-colors tracking-widest"
                     style={{ fontFamily: "'Courier Prime','Courier New',monospace" }} />
@@ -340,6 +314,7 @@
                     RESET
                   </button>
                 </div>
+                <ColorPicker color={dateColor} onChange={setDateColor} label="text color" />
               </Section>
 
               <Section label="Split ratio" value={`${Math.round(split * 100)} / ${Math.round((1 - split) * 100)}`}>
@@ -353,7 +328,21 @@
               </Section>
 
               <Section label="Background color">
-                <ColorPicker color={bgColor} onChange={setBgColor} label="auto-extracted" />
+                <ColorPicker
+                  color={bgColor}
+                  onChange={setBgColor}
+                  onRandom={palette.length > 0 ? randomFromPalette : null}
+                  label={palette.length > 0 ? 'from photo' : 'auto-extracted'}
+                />
+                {palette.length > 0 && (
+                  <div className="flex gap-1.5 mt-2.5">
+                    {palette.map((c, i) => (
+                      <button key={i} onClick={() => setBgColor(c)} title={c}
+                        className={`w-7 h-7 flex-shrink-0 border transition-all ${bgColor === c ? 'border-stone-500 scale-110' : 'border-transparent hover:border-stone-300'}`}
+                        style={{ background: c }} />
+                    ))}
+                  </div>
+                )}
               </Section>
 
               <div className="pt-5 mt-2 border-t border-stone-200">
