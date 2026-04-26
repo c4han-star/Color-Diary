@@ -140,7 +140,6 @@
       const [split, setSplit]         = useState(0.44);
       const [fontSize, setFontSize]   = useState(26);
       const [bgColor, setBgColor]     = useState('#c9bba8');
-      const [dateColor, setDateColor] = useState('#1c1917');
       const [palette, setPalette]     = useState([]);
       const [pan, setPan]             = useState({ x: 0, y: 0 });
       const [dateText, setDateText]   = useState(AUTO_DATE);
@@ -190,19 +189,21 @@
         const lines = measureLines(ctx, title || ' ', CANVAS_W * 0.7);
         const btm = drawLines(ctx, lines, CANVAS_W / 2, topH * 0.46, fontSize * 1.5);
 
-        const ry = btm + 32;
-        ctx.strokeStyle = tc; ctx.globalAlpha = 0.3; ctx.lineWidth = 0.5;
-        ctx.beginPath(); ctx.moveTo(CANVAS_W/2 - 40, ry); ctx.lineTo(CANVAS_W/2 + 40, ry); ctx.stroke();
-        ctx.globalAlpha = 1;
+        if (dateText) {
+          const ry = btm + 32;
+          ctx.strokeStyle = tc; ctx.globalAlpha = 0.3; ctx.lineWidth = 0.5;
+          ctx.beginPath(); ctx.moveTo(CANVAS_W/2 - 40, ry); ctx.lineTo(CANVAS_W/2 + 40, ry); ctx.stroke();
+          ctx.globalAlpha = 1;
 
-        ctx.font = `400 ${Math.max(14, Math.round(fontSize * 0.7))}px "Courier Prime","Courier New",monospace`;
-        if ('letterSpacing' in ctx) ctx.letterSpacing = '4px';
-        ctx.fillStyle = dateColor;
-        ctx.globalAlpha = 0.55;
-        ctx.fillText(dateText || AUTO_DATE, CANVAS_W / 2, ry + 28);
-        ctx.globalAlpha = 1;
-        if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
-      }, [image, bgColor, dateColor, title, split, fontSize, pan, dateText]);
+          ctx.font = `400 ${Math.max(14, Math.round(fontSize * 0.7))}px "Courier Prime","Courier New",monospace`;
+          if ('letterSpacing' in ctx) ctx.letterSpacing = '4px';
+          ctx.fillStyle = tc;
+          ctx.globalAlpha = 0.55;
+          ctx.fillText(dateText, CANVAS_W / 2, ry + 28);
+          ctx.globalAlpha = 1;
+          if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
+        }
+      }, [image, bgColor, title, split, fontSize, pan, dateText]);
 
       useEffect(() => { draw(); }, [draw, fontsReady]);
 
@@ -321,16 +322,16 @@
               </Section>
 
               <Section label="Date">
-                <div className="flex items-center gap-3 mb-2">
+                <div className="flex items-center gap-3">
                   <input type="text" value={dateText} onChange={e => setDateText(e.target.value)}
                     className="flex-1 border-b border-stone-200 focus:border-stone-600 outline-none py-1 text-stone-600 text-xs bg-transparent transition-colors tracking-widest"
-                    style={{ fontFamily: "'Courier Prime','Courier New',monospace" }} />
+                    style={{ fontFamily: "'Courier Prime','Courier New',monospace" }}
+                    placeholder="leave empty to hide" />
                   <button onClick={() => setDateText(AUTO_DATE)}
                     className="text-xs text-stone-400 hover:text-stone-700 transition-colors tracking-widest flex-shrink-0">
                     RESET
                   </button>
                 </div>
-                <ColorPicker color={dateColor} onChange={setDateColor} label="text color" />
               </Section>
 
               <Section label="Split ratio" value={`${Math.round(split * 100)} / ${Math.round((1 - split) * 100)}`}>
