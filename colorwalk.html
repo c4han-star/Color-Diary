@@ -673,13 +673,17 @@
           {showAbout && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/40"
               onClick={() => setShowAbout(false)}>
-              <div className="bg-stone-50 max-w-lg w-full mx-6 p-10 shadow-xl relative"
+              <div className="bg-stone-50 max-w-lg w-full mx-6 shadow-xl relative flex flex-col"
+                style={{ maxHeight: '85vh' }}
                 onClick={e => e.stopPropagation()}>
-                <button onClick={() => setShowAbout(false)}
-                  className="absolute top-5 right-6 text-stone-400 hover:text-stone-700 text-xs tracking-widest transition-colors">
-                  {t.close}
-                </button>
-                <div className="flex flex-col gap-5 text-stone-600 text-sm leading-relaxed">
+                <div className="flex items-center justify-between px-10 pt-8 pb-4 flex-shrink-0">
+                  <span className="text-xs text-stone-400 tracking-widest uppercase">{t.about}</span>
+                  <button onClick={() => setShowAbout(false)}
+                    className="text-stone-400 hover:text-stone-700 text-xs tracking-widest transition-colors">
+                    {t.close}
+                  </button>
+                </div>
+                <div className="overflow-y-auto px-10 pb-10 flex flex-col gap-5 text-stone-600 text-sm leading-relaxed">
                   <img src="persona.svg" alt="" style={{height:'110px',width:'auto'}} />
                   {t.aboutText.map((p, i) => <p key={i} style={{whiteSpace:'pre-line'}}>{p}</p>)}
                 </div>
