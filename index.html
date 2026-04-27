@@ -470,11 +470,15 @@
 
         if (n === 1) {
           ps.current = { sx: e.clientX, sy: e.clientY, spx: pan.x, spy: pan.y, moved: false, dragActive: false };
-          if (e.pointerType === 'mouse' && image) {
-            const rect = wrapRef.current.getBoundingClientRect();
-            if ((e.clientY - rect.top) / rect.height >= split) {
+          if (image) {
+            if (e.pointerType === 'mouse') {
+              const rect = wrapRef.current.getBoundingClientRect();
+              if ((e.clientY - rect.top) / rect.height >= split) {
+                ps.current.dragActive = true;
+                e.preventDefault();
+              }
+            } else {
               ps.current.dragActive = true;
-              e.preventDefault();
             }
           }
         } else if (n === 2) {
@@ -532,7 +536,7 @@
         const dx = e.clientX - ps.current.sx, dy = e.clientY - ps.current.sy;
         if (Math.hypot(dx, dy) > 8) ps.current.moved = true;
 
-        if (e.pointerType === 'mouse' && ps.current.dragActive && image) {
+        if (ps.current.dragActive && image) {
           const iw = image.videoWidth  || image.naturalWidth  || image.width;
           const ih = image.videoHeight || image.naturalHeight || image.height;
           const botH = CANVAS_H - Math.round(CANVAS_H * split);
