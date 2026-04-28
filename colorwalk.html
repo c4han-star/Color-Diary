@@ -59,6 +59,9 @@
         dragHint: 'DRAG TO REPOSITION', dragHintTouch: 'TWO FINGERS TO REPOSITION',
         captionImageTouch: 'TWO-FINGER DRAG · TAP TO REPLACE',
         dropImage: 'DROP FILE',
+        socialLabel: 'Find me on',
+        coffeeLabel: 'Buy me a coffee ☕',
+        coffeeNote: 'If this little tool helped you, you can support me here :)',
         aboutText: [
           "I'm a product designer who loves editing photos (and yes, I probably spend way too much time on Xiaohongshu and Instagram).",
           "Lately, the whole color walk thing has been everywhere.\nThose split covers — half color, half photo — look like something you can just throw together.",
@@ -88,6 +91,9 @@
         dragHint: '拖拽调整位置', dragHintTouch: '双指拖动调整位置',
         captionImageTouch: '双指拖动 · 点击换图',
         dropImage: '松开上传',
+        socialLabel: '找到我',
+        coffeeLabel: '请我喝杯咖啡 ☕',
+        coffeeNote: '如果觉得好用，可以请我喝杯咖啡～',
         aboutText: [
           "我是个很爱修图的产品设计师（也确实在小红书和 IG 上待太久了）。",
           "最近 color walk 真的太火了。\n那种一半颜色一半照片的封面，看着像「随便做做就有了」。",
@@ -699,6 +705,33 @@
                 <div className="overflow-y-auto px-10 pb-10 flex flex-col gap-5 text-stone-600 text-sm leading-relaxed">
                   <img src="persona.svg" alt="" style={{height:'110px',width:'auto'}} />
                   {t.aboutText.map((p, i) => <p key={i} style={{whiteSpace:'pre-line'}}>{p}</p>)}
+
+                  {/* Social links */}
+                  <div className="pt-2 border-t border-stone-100 flex items-center gap-5">
+                    <a href="https://www.xiaohongshu.com/discovery/item/69eef9a5000000003503bfeb"
+                      target="_blank" rel="noopener noreferrer"
+                      className="text-xs text-stone-400 hover:text-stone-700 transition-colors tracking-widest"
+                      style={{textDecoration:'none'}}>
+                      小红书
+                    </a>
+                    <a href="https://www.instagram.com/fin_nickk"
+                      target="_blank" rel="noopener noreferrer"
+                      className="text-xs text-stone-400 hover:text-stone-700 transition-colors tracking-widest"
+                      style={{textDecoration:'none'}}>
+                      Instagram
+                    </a>
+                  </div>
+
+                  {/* Buy me a coffee */}
+                  <div className="flex flex-col gap-1.5">
+                    <p className="text-xs text-stone-400 leading-relaxed">{t.coffeeNote}</p>
+                    <a href="YOUR_COFFEE_LINK"
+                      target="_blank" rel="noopener noreferrer"
+                      className="text-xs text-stone-500 hover:text-stone-800 transition-colors tracking-widest self-start"
+                      style={{textDecoration:'none', borderBottom:'1px solid currentColor', paddingBottom:'1px'}}>
+                      {t.coffeeLabel}
+                    </a>
+                  </div>
                 </div>
               </div>
             </div>
