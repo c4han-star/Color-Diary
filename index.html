@@ -29,6 +29,8 @@
     input[type='color']::-webkit-color-swatch { border: 1px solid #d6d3d1; border-radius: 0; }
     .no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
     .no-scrollbar::-webkit-scrollbar { display: none; }
+    @keyframes cdFadeIn  { from { opacity: 0 } to { opacity: 1 } }
+    @keyframes cdScaleIn { from { opacity: 0; transform: scale(0.94) } to { opacity: 1; transform: scale(1) } }
   </style>
 </head>
 <body>
@@ -213,6 +215,7 @@
     function App() {
       const [lang, setLang]           = useState('en');
       const [showAbout, setShowAbout] = useState(false);
+      const [showCoffee, setShowCoffee] = useState(false);
       const t = T[lang];
       const AUTO_DATE = lang === 'en' ? AUTO_DATE_EN : AUTO_DATE_CN;
 
@@ -735,13 +738,57 @@
                   {/* Buy me a coffee */}
                   <div className="flex flex-col gap-1.5">
                     <p className="text-xs text-stone-400 leading-relaxed">{t.coffeeNote}</p>
-                    <a href="YOUR_COFFEE_LINK"
-                      target="_blank" rel="noopener noreferrer"
+                    <button onClick={() => setShowCoffee(true)}
                       className="text-xs text-stone-500 hover:text-stone-800 transition-colors tracking-widest self-start"
-                      style={{textDecoration:'none', borderBottom:'1px solid currentColor', paddingBottom:'1px'}}>
+                      style={{background:'none',border:'none',padding:0,cursor:'pointer',borderBottom:'1px solid currentColor',paddingBottom:'1px',fontFamily:'inherit'}}>
                       {t.coffeeLabel}
-                    </a>
+                    </button>
                   </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {showCoffee && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center px-6"
+              style={{background:'rgba(41,37,36,0.35)', animation:'cdFadeIn 0.18s ease'}}
+              onClick={() => setShowCoffee(false)}>
+              <div onClick={e => e.stopPropagation()}
+                style={{background:'#faf9f7', borderRadius:'18px', maxWidth:'320px', width:'100%',
+                  padding:'28px 24px 24px', boxShadow:'0 8px 40px rgba(0,0,0,0.12)',
+                  animation:'cdScaleIn 0.18s ease', position:'relative'}}>
+
+                {/* Close */}
+                <button onClick={() => setShowCoffee(false)}
+                  style={{position:'absolute',top:'14px',right:'16px',background:'none',border:'none',
+                    cursor:'pointer',color:'#a8a29e',fontSize:'18px',lineHeight:1,padding:'2px 4px',fontFamily:'inherit'}}
+                  aria-label="close">×</button>
+
+                {/* Title */}
+                <p style={{fontSize:'11px',letterSpacing:'0.13em',color:'#a8a29e',textTransform:'uppercase',marginBottom:'20px',marginRight:'24px'}}>
+                  Support this little project ☕
+                </p>
+
+                {/* QR codes */}
+                <div style={{display:'flex',gap:'14px',marginBottom:'20px'}}>
+                  {[
+                    {src:'qr-wechat.png', label:'wechat pay'},
+                    {src:'qr-zelle.png',  label:'zelle'},
+                  ].map(({src,label}) => (
+                    <div key={label} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:'8px'}}>
+                      <div style={{width:'100%',aspectRatio:'1',background:'#f0ede9',borderRadius:'10px',overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                        <img src={src} alt={label} style={{width:'100%',height:'100%',objectFit:'contain'}}
+                          onError={e=>{e.currentTarget.style.display='none'; e.currentTarget.parentNode.style.background='#e7e3de';}} />
+                      </div>
+                      <span style={{fontSize:'10px',letterSpacing:'0.1em',color:'#78716c'}}>{label}</span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Illustration */}
+                <div style={{textAlign:'center'}}>
+                  <img src="coffee-person.png" alt="" style={{height:'90px',width:'auto',opacity:0.9}}
+                    onError={e=>{e.currentTarget.style.display='none';}} />
                 </div>
               </div>
             </div>
