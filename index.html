@@ -707,18 +707,26 @@
                   {t.aboutText.map((p, i) => <p key={i} style={{whiteSpace:'pre-line'}}>{p}</p>)}
 
                   {/* Social links */}
-                  <div className="pt-2 border-t border-stone-100 flex items-center gap-5">
+                  <div className="pt-2 border-t border-stone-100 flex items-center gap-4">
                     <a href="https://www.xiaohongshu.com/discovery/item/69eef9a5000000003503bfeb"
-                      target="_blank" rel="noopener noreferrer"
-                      className="text-xs text-stone-400 hover:text-stone-700 transition-colors tracking-widest"
-                      style={{textDecoration:'none'}}>
-                      小红书
+                      target="_blank" rel="noopener noreferrer" title="小红书"
+                      className="text-stone-400 hover:text-stone-700 transition-colors"
+                      style={{display:'flex',alignItems:'center'}}>
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                        <rect x="1" y="1" width="22" height="22" rx="5" fill="currentColor" opacity="0.12"/>
+                        <text x="12" y="16.5" textAnchor="middle" fontSize="9" fontWeight="700" fontFamily="sans-serif" fill="currentColor" letterSpacing="-0.5">RED</text>
+                        <circle cx="18" cy="6" r="1.5" fill="currentColor"/>
+                      </svg>
                     </a>
                     <a href="https://www.instagram.com/fin_nickk"
-                      target="_blank" rel="noopener noreferrer"
-                      className="text-xs text-stone-400 hover:text-stone-700 transition-colors tracking-widest"
-                      style={{textDecoration:'none'}}>
-                      Instagram
+                      target="_blank" rel="noopener noreferrer" title="Instagram"
+                      className="text-stone-400 hover:text-stone-700 transition-colors"
+                      style={{display:'flex',alignItems:'center'}}>
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" xmlns="http://www.w3.org/2000/svg">
+                        <rect x="2" y="2" width="20" height="20" rx="5"/>
+                        <circle cx="12" cy="12" r="4.5"/>
+                        <circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"/>
+                      </svg>
                     </a>
                   </div>
 
