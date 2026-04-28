@@ -772,8 +772,8 @@
                 {/* QR codes */}
                 <div style={{display:'flex',gap:'14px',marginBottom:'20px'}}>
                   {[
-                    {src:'qr-wechat.png', label:'wechat pay'},
-                    {src:'qr-zelle.png',  label:'zelle'},
+                    {src:'wechatpay.png',    label:'wechat pay'},
+                    {src:'zelle%20pay.png',  label:'zelle'},
                   ].map(({src,label}) => (
                     <div key={label} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:'8px'}}>
                       <div style={{width:'100%',aspectRatio:'1',background:'#f0ede9',borderRadius:'10px',overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
@@ -787,7 +787,7 @@
 
                 {/* Illustration */}
                 <div style={{textAlign:'center'}}>
-                  <img src="coffee-person.png" alt="" style={{height:'90px',width:'auto',opacity:0.9}}
+                  <img src="coffee%20person.svg" alt="" style={{height:'90px',width:'auto',opacity:0.9}}
                     onError={e=>{e.currentTarget.style.display='none';}} />
                 </div>
               </div>
