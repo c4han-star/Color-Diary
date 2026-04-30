@@ -237,6 +237,7 @@
       const [activeTab, setActiveTab] = useState('photo');
       const [savedImgUrl, setSavedImgUrl] = useState(null);
       const [photoZoom, setPhotoZoom] = useState(1);
+      const [rotation, setRotation]   = useState(0);
       const [grainEnabled, setGrainEnabled] = useState(false);
       const [grainIntensity, setGrainIntensity] = useState(30);
 
@@ -284,7 +285,11 @@
           else          { sw = iw / photoZoom; sh = sw / ta; }
           const sx = Math.max(0, Math.min(iw - sw, (iw - sw) / 2 + pan.x));
           const sy = Math.max(0, Math.min(ih - sh, (ih - sh) / 2 + pan.y));
+          const cx = CANVAS_W / 2, cy = topH + botH / 2;
+          ctx.save();
+          ctx.translate(cx, cy); ctx.rotate(rotation * Math.PI / 180); ctx.translate(-cx, -cy);
           ctx.drawImage(image, sx, sy, sw, sh, 0, topH, CANVAS_W, botH);
+          ctx.restore();
         } else {
           ctx.fillStyle = '#b8afa6';
           ctx.fillRect(0, topH, CANVAS_W, botH);
@@ -315,7 +320,7 @@
           ctx.globalAlpha = 1;
           if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
         }
-      }, [image, bgColor, title, split, fontSize, pan, dateText, lang, photoZoom, grainEnabled, grainIntensity]);
+      }, [image, bgColor, title, split, fontSize, pan, dateText, lang, photoZoom, rotation, grainEnabled, grainIntensity]);
 
       useEffect(() => { draw(); }, [draw, fontsReady]);
 
@@ -330,7 +335,7 @@
         const url = URL.createObjectURL(file);
 
         const afterLoad = async (el, type) => {
-          setImage(el); setSourceType(type); setPan({ x: 0, y: 0 }); setPhotoZoom(1);
+          setImage(el); setSourceType(type); setPan({ x: 0, y: 0 }); setPhotoZoom(1); setRotation(0);
           clearTimeout(hintTimer.current);
           setShowPanHint(true);
           hintTimer.current = setTimeout(() => setShowPanHint(false), 2500);
@@ -504,6 +509,8 @@
             startZoom: photoZoom,
             prevMidX: (pts[0].x + pts[1].x) / 2,
             prevMidY: (pts[0].y + pts[1].y) / 2,
+            initialAngle: Math.atan2(pts[1].y - pts[0].y, pts[1].x - pts[0].x) * 180 / Math.PI,
+            startRotation: rotation,
           };
         }
       };
@@ -523,6 +530,10 @@
           const newZoom = Math.max(1, Math.min(5,
             lastPinch.current.startZoom * newDist / lastPinch.current.dist));
           setPhotoZoom(newZoom);
+
+          // Rotate → continuous, no snap
+          const currentAngle = Math.atan2(pts[1].y - pts[0].y, pts[1].x - pts[0].x) * 180 / Math.PI;
+          setRotation(lastPinch.current.startRotation + (currentAngle - lastPinch.current.initialAngle));
 
           // Drag midpoint → pan photo, scale delta by current crop size
           const dmx = newMidX - lastPinch.current.prevMidX;
@@ -624,7 +635,11 @@
           else          { sw = iw / photoZoom; sh = sw / ta; }
           const sx = Math.max(0, Math.min(iw - sw, (iw - sw) / 2 + pan.x));
           const sy = Math.max(0, Math.min(ih - sh, (ih - sh) / 2 + pan.y));
+          const cx = EW / 2, cy = topH + botH / 2;
+          ctx.save();
+          ctx.translate(cx, cy); ctx.rotate(rotation * Math.PI / 180); ctx.translate(-cx, -cy);
           ctx.drawImage(image, sx, sy, sw, sh, 0, topH, EW, botH);
+          ctx.restore();
         } else {
           ctx.fillStyle = '#b8afa6';
           ctx.fillRect(0, topH, EW, botH);
@@ -673,7 +688,7 @@
             setTimeout(() => URL.revokeObjectURL(url), 1000);
           }
         }, 'image/png');
-      }, [title, isMobile, image, split, bgColor, fontSize, photoZoom, pan, dateText, grainEnabled, grainIntensity]);
+      }, [title, isMobile, image, split, bgColor, fontSize, photoZoom, rotation, pan, dateText, grainEnabled, grainIntensity]);
 
       return (
         <div className="bg-stone-50" style={{ fontFamily: "'Courier Prime','Courier New',monospace", ...(isMobile ? { height: viewH, overflow: 'hidden' } : { minHeight: '100vh' }) }}>
