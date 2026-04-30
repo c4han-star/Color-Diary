@@ -280,16 +280,17 @@
           const iw = image.videoWidth  || image.naturalWidth  || image.width;
           const ih = image.videoHeight || image.naturalHeight || image.height;
           const ia = iw / ih, ta = CANVAS_W / botH;
-          let sw, sh;
-          if (ia > ta) { sh = ih / photoZoom; sw = sh * ta; }
-          else          { sw = iw / photoZoom; sh = sw / ta; }
-          const sx = Math.max(0, Math.min(iw - sw, (iw - sw) / 2 + pan.x));
-          const sy = Math.max(0, Math.min(ih - sh, (ih - sh) / 2 + pan.y));
+          let baseW, baseH;
+          if (ia > ta) { baseH = botH; baseW = baseH * ia; }
+          else          { baseW = CANVAS_W; baseH = baseW / ia; }
+          const dw = baseW * photoZoom, dh = baseH * photoZoom;
+          const dx = (CANVAS_W - dw) / 2 + pan.x;
+          const dy = topH + (botH - dh) / 2 + pan.y;
           const cx = CANVAS_W / 2, cy = topH + botH / 2;
           ctx.save();
           ctx.beginPath(); ctx.rect(0, topH, CANVAS_W, botH); ctx.clip();
           ctx.translate(cx, cy); ctx.rotate(rotation * Math.PI / 180); ctx.translate(-cx, -cy);
-          ctx.drawImage(image, sx, sy, sw, sh, 0, topH, CANVAS_W, botH);
+          ctx.drawImage(image, dx, dy, dw, dh);
           ctx.restore();
         } else {
           ctx.fillStyle = '#b8afa6';
@@ -527,8 +528,8 @@
           const newMidX = (pts[0].x + pts[1].x) / 2;
           const newMidY = (pts[0].y + pts[1].y) / 2;
 
-          // Pinch → zoom photo inside container (min 1 = cover, max 5x)
-          const newZoom = Math.max(1, Math.min(5,
+          // Pinch → zoom freely, no minimum cover constraint
+          const newZoom = Math.max(0.05, Math.min(10,
             lastPinch.current.startZoom * newDist / lastPinch.current.dist));
           setPhotoZoom(newZoom);
 
@@ -536,23 +537,12 @@
           const currentAngle = Math.atan2(pts[1].y - pts[0].y, pts[1].x - pts[0].x) * 180 / Math.PI;
           setRotation(lastPinch.current.startRotation + (currentAngle - lastPinch.current.initialAngle));
 
-          // Drag midpoint → pan photo, scale delta by current crop size
+          // Drag midpoint → pan in canvas pixel space
           const dmx = newMidX - lastPinch.current.prevMidX;
           const dmy = newMidY - lastPinch.current.prevMidY;
           if (image && (Math.abs(dmx) > 0.3 || Math.abs(dmy) > 0.3)) {
-            const iw = image.videoWidth  || image.naturalWidth  || image.width;
-            const ih = image.videoHeight || image.naturalHeight || image.height;
-            const botH = CANVAS_H - Math.round(CANVAS_H * split);
-            const botH_p = PH - Math.round(PH * split);
-            const ta = CANVAS_W / botH, ia = iw / ih;
-            let sw, sh;
-            if (ia > ta) { sh = ih / newZoom; sw = sh * ta; }
-            else          { sw = iw / newZoom; sh = sw / ta; }
-            setPan(prev => clampPan(
-              prev.x - dmx * (sw / PW),
-              prev.y - dmy * (sh / botH_p),
-              newZoom,
-            ));
+            const s = CANVAS_W / PW;
+            setPan(prev => ({ x: prev.x + dmx * s, y: prev.y + dmy * s }));
           }
           lastPinch.current.prevMidX = newMidX;
           lastPinch.current.prevMidY = newMidY;
@@ -564,19 +554,8 @@
         if (Math.hypot(dx, dy) > 8) ps.current.moved = true;
 
         if (ps.current.dragActive && image) {
-          const iw = image.videoWidth  || image.naturalWidth  || image.width;
-          const ih = image.videoHeight || image.naturalHeight || image.height;
-          const botH = CANVAS_H - Math.round(CANVAS_H * split);
-          const botH_p = PH - Math.round(PH * split);
-          const ta = CANVAS_W / botH, ia = iw / ih;
-          let sw, sh;
-          if (ia > ta) { sh = ih / photoZoom; sw = sh * ta; }
-          else          { sw = iw / photoZoom; sh = sw / ta; }
-          setPan(clampPan(
-            ps.current.spx - dx * (sw / PW),
-            ps.current.spy - dy * (sh / botH_p),
-            photoZoom,
-          ));
+          const s = CANVAS_W / PW;
+          setPan({ x: ps.current.spx + dx * s, y: ps.current.spy + dy * s });
         }
       };
 
@@ -608,9 +587,9 @@
           const iw = image.videoWidth || image.naturalWidth || image.width;
           const ih = image.videoHeight || image.naturalHeight || image.height;
           if (iw && ih) {
-            const ta = CANVAS_W / botH_c, ia = iw / ih;
-            const sw = ia > ta ? (ih / photoZoom) * ta : iw / photoZoom;
-            scale = Math.min(3, Math.max(1, sw / CANVAS_W));
+            const ia = iw / ih, ta = CANVAS_W / botH_c;
+            const baseW = ia > ta ? botH_c * ia : CANVAS_W;
+            scale = Math.min(3, Math.max(1, iw / (baseW * photoZoom)));
           }
         }
 
@@ -630,17 +609,18 @@
         if (image) {
           const iw = image.videoWidth || image.naturalWidth || image.width;
           const ih = image.videoHeight || image.naturalHeight || image.height;
-          const ta = CANVAS_W / botH_c, ia = iw / ih;
-          let sw, sh;
-          if (ia > ta) { sh = ih / photoZoom; sw = sh * ta; }
-          else          { sw = iw / photoZoom; sh = sw / ta; }
-          const sx = Math.max(0, Math.min(iw - sw, (iw - sw) / 2 + pan.x));
-          const sy = Math.max(0, Math.min(ih - sh, (ih - sh) / 2 + pan.y));
+          const ia = iw / ih, ta = CANVAS_W / botH_c;
+          let baseW, baseH;
+          if (ia > ta) { baseH = botH_c; baseW = baseH * ia; }
+          else          { baseW = CANVAS_W; baseH = baseW / ia; }
+          const dw = baseW * photoZoom * scale, dh = baseH * photoZoom * scale;
+          const dx = (EW - dw) / 2 + pan.x * scale;
+          const dy = topH + (botH - dh) / 2 + pan.y * scale;
           const cx = EW / 2, cy = topH + botH / 2;
           ctx.save();
           ctx.beginPath(); ctx.rect(0, topH, EW, botH); ctx.clip();
           ctx.translate(cx, cy); ctx.rotate(rotation * Math.PI / 180); ctx.translate(-cx, -cy);
-          ctx.drawImage(image, sx, sy, sw, sh, 0, topH, EW, botH);
+          ctx.drawImage(image, dx, dy, dw, dh);
           ctx.restore();
         } else {
           ctx.fillStyle = '#b8afa6';
