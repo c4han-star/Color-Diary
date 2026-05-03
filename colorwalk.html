@@ -355,10 +355,12 @@
 
           if (type === 'video') {
             el.addEventListener('timeupdate', () => {
-              const tmp = document.createElement('canvas');
-              tmp.width = 200; tmp.height = 200;
-              tmp.getContext('2d').drawImage(el, 0, 0, 200, 200);
-              doExtract(tmp);
+              requestAnimationFrame(() => {
+                const tmp = document.createElement('canvas');
+                tmp.width = 200; tmp.height = 200;
+                tmp.getContext('2d').drawImage(el, 0, 0, 200, 200);
+                doExtract(tmp.toDataURL('image/jpeg', 0.8));
+              });
             }, { once: true });
           } else {
             doExtract(url);
