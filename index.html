@@ -341,20 +341,28 @@
           clearTimeout(hintTimer.current);
           setShowPanHint(true);
           hintTimer.current = setTimeout(() => setShowPanHint(false), 2500);
-          try {
-            let src = type === 'video' ? (() => {
+
+          const doExtract = async (src) => {
+            try {
+              const p = await Vibrant.from(src).getPalette();
+              const keys = ['Vibrant','LightVibrant','DarkVibrant','Muted','LightMuted','DarkMuted'];
+              const colors = keys.map(k => p[k]?.hex).filter(Boolean);
+              setPalette(colors);
+              const v = p.Vibrant ?? p.LightVibrant ?? p.Muted;
+              if (v) setBgColor(v.hex);
+            } catch (e) {}
+          };
+
+          if (type === 'video') {
+            el.addEventListener('timeupdate', () => {
               const tmp = document.createElement('canvas');
               tmp.width = 200; tmp.height = 200;
               tmp.getContext('2d').drawImage(el, 0, 0, 200, 200);
-              return tmp;
-            })() : url;
-            const p = await Vibrant.from(src).getPalette();
-            const keys = ['Vibrant','LightVibrant','DarkVibrant','Muted','LightMuted','DarkMuted'];
-            const colors = keys.map(k => p[k]?.hex).filter(Boolean);
-            setPalette(colors);
-            const v = p.Vibrant ?? p.LightVibrant ?? p.Muted;
-            if (v) setBgColor(v.hex);
-          } catch (e) {}
+              doExtract(tmp);
+            }, { once: true });
+          } else {
+            doExtract(url);
+          }
         };
 
         if (file.type.startsWith('image/')) {
