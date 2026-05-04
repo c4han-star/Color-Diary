@@ -259,11 +259,18 @@
       const videoElRef = useRef(null); // keeps video element in DOM for iOS canvas drawImage
 
       const [viewW, setViewW] = useState(window.innerWidth);
-      const [viewH, setViewH] = useState(window.innerHeight);
+      const [viewH, setViewH] = useState(window.visualViewport?.height ?? window.innerHeight);
       useEffect(() => {
-        const handler = () => { setViewW(window.innerWidth); setViewH(window.innerHeight); };
+        const handler = () => {
+          setViewW(window.innerWidth);
+          setViewH(window.visualViewport?.height ?? window.innerHeight);
+        };
         window.addEventListener('resize', handler);
-        return () => window.removeEventListener('resize', handler);
+        window.visualViewport?.addEventListener('resize', handler);
+        return () => {
+          window.removeEventListener('resize', handler);
+          window.visualViewport?.removeEventListener('resize', handler);
+        };
       }, []);
       const isMobile = viewW < 640;
       // Fixed dark workspace height: 57% of usable viewport (below ~54px header)
