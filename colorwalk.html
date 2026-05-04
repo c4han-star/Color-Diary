@@ -945,7 +945,7 @@
                         </button>
                       ))}
                     </div>
-                    <div className="px-4 py-4 w-full min-h-[88px] border-b border-stone-100">
+                    <div className="px-4 py-4 w-full min-h-[88px] border-b border-stone-100 overflow-y-auto" style={{maxHeight:'45vh', touchAction:'pan-y'}}>
                       {activeTab === 'photo' && (
                         <button onClick={() => fileRef.current?.click()}
                           className="w-full py-2.5 border border-stone-300 text-stone-600 text-xs tracking-widest">
