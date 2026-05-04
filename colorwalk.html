@@ -275,6 +275,8 @@
       const isMobile = viewW < 640;
       // Fixed dark workspace height: 57% of usable viewport (below ~54px header)
       const darkAreaH = isMobile ? Math.max(220, Math.round((viewH - 54) * 0.57)) : 0;
+      // Remaining height for the scrollable tab panel (header 54 + exportRow 52 + tabBar 48)
+      const panelH = isMobile ? Math.max(80, viewH - 54 - darkAreaH - 52 - 48) : 0;
       // Card occupies 83% of dark area height — slightly larger default, visible dark border
       const PW = isMobile
         ? Math.round(darkAreaH * 0.83 * CANVAS_W / CANVAS_H)
@@ -952,7 +954,7 @@
                         </button>
                       ))}
                     </div>
-                    <div className="px-4 py-4 w-full min-h-[88px] border-b border-stone-100 overflow-y-auto" style={{maxHeight:'45vh', touchAction:'pan-y'}}>
+                    <div className="px-4 py-4 w-full border-b border-stone-100 overflow-y-auto" style={{height: panelH, touchAction:'pan-y'}}>
                       {activeTab === 'photo' && (
                         <button onClick={() => fileRef.current?.click()}
                           className="w-full py-2.5 border border-stone-300 text-stone-600 text-xs tracking-widest">
