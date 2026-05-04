@@ -51,6 +51,7 @@
         split: 'Split ratio', fontSize: 'Font size', bgColor: 'Background color',
         fromPhoto: 'from photo', autoExtracted: 'auto-extracted', random: '↻ RANDOM',
         grain: 'Grain', grainOff: 'OFF', grainOn: 'ON',
+        grad: 'Gradient', gradOff: 'OFF', gradOn: 'ON',
         exportBtn: 'EXPORT AS PNG', exportNote: 'exports at full resolution',
         exportVideoBtn: 'EXPORT AS VIDEO', exportVideoNote: 'records up to 5 sec · exports as .mp4',
         recording: 'RECORDING…',
@@ -83,6 +84,7 @@
         split: '分割比例', fontSize: '字体大小', bgColor: '背景颜色',
         fromPhoto: '来自照片', autoExtracted: '自动提取', random: '↻ 随机',
         grain: '颗粒', grainOff: '关', grainOn: '开',
+        grad: '渐变色', gradOff: '关', gradOn: '开',
         exportBtn: '导出 PNG', exportNote: '按原图分辨率导出',
         exportVideoBtn: '导出视频', exportVideoNote: '最长录制 5 秒 · 导出为 .mp4',
         recording: '录制中…',
@@ -156,11 +158,16 @@
       } catch(e) {}
     }
 
-    function drawGradBlock(ctx, color, x, y, w, h, grain) {
+    function drawGradBlock(ctx, color, x, y, w, h, grain, color2) {
       const g = ctx.createLinearGradient(x, y, x, y + h);
-      g.addColorStop(0,    shiftColor(color,  24));
-      g.addColorStop(0.52, color);
-      g.addColorStop(1,    shiftColor(color, -22));
+      if (color2) {
+        g.addColorStop(0, color);
+        g.addColorStop(1, color2);
+      } else {
+        g.addColorStop(0,    shiftColor(color,  24));
+        g.addColorStop(0.52, color);
+        g.addColorStop(1,    shiftColor(color, -22));
+      }
       ctx.fillStyle = g;
       ctx.fillRect(x, y, w, h);
       addGrain(ctx, x, y, w, h, grain);
@@ -240,6 +247,8 @@
       const [rotation, setRotation]   = useState(0);
       const [grainEnabled, setGrainEnabled] = useState(false);
       const [grainIntensity, setGrainIntensity] = useState(30);
+      const [gradMode, setGradMode]   = useState(false);
+      const [bgColor2, setBgColor2]   = useState('#f0e6d3');
 
       const canvasRef = useRef(null), fileRef = useRef(null), wrapRef = useRef(null);
       const ps = useRef({ on: false, sx: 0, sy: 0, spx: 0, spy: 0, moved: false, inImg: false, dragActive: false });
@@ -273,7 +282,7 @@
         const topH = Math.round(CANVAS_H * split), botH = CANVAS_H - topH;
         ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
 
-        drawGradBlock(ctx, bgColor, 0, 0, CANVAS_W, topH, grainEnabled ? Math.round(grainIntensity * 0.5) : 0);
+        drawGradBlock(ctx, bgColor, 0, 0, CANVAS_W, topH, grainEnabled ? Math.round(grainIntensity * 0.5) : 0, gradMode ? bgColor2 : null);
 
         if (image) {
           // videoWidth/videoHeight for <video>, naturalWidth for <img>
@@ -322,7 +331,7 @@
           ctx.globalAlpha = 1;
           if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
         }
-      }, [image, bgColor, title, split, fontSize, pan, dateText, lang, photoZoom, rotation, grainEnabled, grainIntensity]);
+      }, [image, bgColor, bgColor2, gradMode, title, split, fontSize, pan, dateText, lang, photoZoom, rotation, grainEnabled, grainIntensity]);
 
       useEffect(() => { draw(); }, [draw, fontsReady]);
 
@@ -614,7 +623,7 @@
 
         ctx.fillStyle = bgColor;
         ctx.fillRect(0, 0, EW, EH);
-        drawGradBlock(ctx, bgColor, 0, 0, EW, topH, grainEnabled ? Math.round(grainIntensity * 0.5) : 0);
+        drawGradBlock(ctx, bgColor, 0, 0, EW, topH, grainEnabled ? Math.round(grainIntensity * 0.5) : 0, gradMode ? bgColor2 : null);
 
         if (image) {
           const iw = image.videoWidth || image.naturalWidth || image.width;
@@ -680,7 +689,7 @@
             setTimeout(() => URL.revokeObjectURL(url), 1000);
           }
         }, 'image/png');
-      }, [title, isMobile, image, split, bgColor, fontSize, photoZoom, rotation, pan, dateText, grainEnabled, grainIntensity]);
+      }, [title, isMobile, image, split, bgColor, bgColor2, gradMode, fontSize, photoZoom, rotation, pan, dateText, grainEnabled, grainIntensity]);
 
       return (
         <div className="bg-stone-50" style={{ fontFamily: "'Courier Prime','Courier New',monospace", ...(isMobile ? { height: viewH, overflow: 'hidden' } : { minHeight: '100vh' }) }}>
@@ -980,6 +989,20 @@
                             randomLabel={t.random} />
                           <div className="pt-2 border-t border-stone-100">
                             <div className="flex items-center justify-between mb-2">
+                              <span className="text-xs text-stone-400 uppercase" style={{letterSpacing:'0.14em'}}>{t.grad}</span>
+                              <button onClick={() => setGradMode(v => !v)}
+                                className={`text-xs tracking-widest transition-colors ${gradMode ? 'text-stone-800' : 'text-stone-400'}`}>
+                                {gradMode ? t.gradOn : t.gradOff}
+                              </button>
+                            </div>
+                            {gradMode && (
+                              <ColorPicker color={bgColor2} onChange={setBgColor2}
+                                onRandom={palette.length > 0 ? () => setBgColor2(palette[Math.floor(Math.random()*palette.length)]) : null}
+                                palette={palette} randomLabel={t.random} />
+                            )}
+                          </div>
+                          <div className="pt-2 border-t border-stone-100">
+                            <div className="flex items-center justify-between mb-2">
                               <span className="text-xs text-stone-400 uppercase" style={{letterSpacing:'0.14em'}}>{t.grain}</span>
                               <button onClick={() => setGrainEnabled(v => !v)}
                                 className={`text-xs tracking-widest transition-colors ${grainEnabled ? 'text-stone-800' : 'text-stone-400'}`}>
@@ -1040,6 +1063,20 @@
                     palette={palette}
                     label={palette.length > 0 ? t.fromPhoto : t.autoExtracted}
                     randomLabel={t.random} />
+                  <div className="flex items-center justify-between mt-2">
+                    <span className="text-xs text-stone-400 uppercase" style={{letterSpacing:'0.14em'}}>{t.grad}</span>
+                    <button onClick={() => setGradMode(v => !v)}
+                      className={`text-xs tracking-widest transition-colors ${gradMode ? 'text-stone-800' : 'text-stone-400 hover:text-stone-600'}`}>
+                      {gradMode ? t.gradOn : t.gradOff}
+                    </button>
+                  </div>
+                  {gradMode && (
+                    <div className="mt-2">
+                      <ColorPicker color={bgColor2} onChange={setBgColor2}
+                        onRandom={palette.length > 0 ? () => setBgColor2(palette[Math.floor(Math.random()*palette.length)]) : null}
+                        palette={palette} randomLabel={t.random} />
+                    </div>
+                  )}
                 </Section>
                 <Section label={t.grain} value={grainEnabled ? `${grainIntensity}` : t.grainOff}>
                   <div className="flex items-center justify-between mt-1">
