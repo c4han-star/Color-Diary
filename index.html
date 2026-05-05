@@ -263,16 +263,22 @@
 
       const [viewW, setViewW] = useState(window.innerWidth);
       const [viewH, setViewH] = useState(window.visualViewport?.height ?? window.innerHeight);
+      const [keyboardH, setKeyboardH] = useState(0);
       useEffect(() => {
         const handler = () => {
+          const vvh = window.visualViewport?.height ?? window.innerHeight;
           setViewW(window.innerWidth);
-          setViewH(window.visualViewport?.height ?? window.innerHeight);
+          setViewH(vvh);
+          // keyboard height = gap between layout viewport and visual viewport
+          setKeyboardH(window.visualViewport ? Math.max(0, window.innerHeight - vvh) : 0);
         };
         window.addEventListener('resize', handler);
         window.visualViewport?.addEventListener('resize', handler);
+        window.visualViewport?.addEventListener('scroll', handler);
         return () => {
           window.removeEventListener('resize', handler);
           window.visualViewport?.removeEventListener('resize', handler);
+          window.visualViewport?.removeEventListener('scroll', handler);
         };
       }, []);
       const isMobile = viewW < 640;
@@ -1026,7 +1032,7 @@
               { id: 'color',    icon: '■',   label: t.bgColor  },
             ];
             return (
-              <div style={{position:'fixed', bottom:0, left:0, right:0, height:bottomH, display:'flex', flexDirection:'column', background:'#fafaf9', zIndex:10, borderTop:'1px solid #e7e5e4'}}>
+              <div style={{position:'fixed', bottom:keyboardH, left:0, right:0, height:bottomH, display:'flex', flexDirection:'column', background:'#fafaf9', zIndex:10, borderTop:'1px solid #e7e5e4'}}>
                 {/* Export row */}
                 <div className="px-5 py-3 flex items-center justify-between w-full border-b border-stone-100 bg-stone-50" style={{flexShrink:0}}>
                   <span className="text-xs text-stone-400" style={{letterSpacing:'0.07em'}}>
