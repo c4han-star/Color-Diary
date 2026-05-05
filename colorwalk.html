@@ -274,9 +274,9 @@
       }, []);
       const isMobile = viewW < 640;
       // Fixed dark workspace height: 57% of usable viewport (below ~54px header)
-      const darkAreaH = isMobile ? Math.max(220, Math.round((viewH - 54) * 0.57)) : 0;
-      // Remaining height for the scrollable tab panel (header 54 + exportRow 52 + tabBar 48)
-      const panelH = isMobile ? Math.max(80, viewH - 54 - darkAreaH - 52 - 48) : 0;
+      const darkAreaH = isMobile ? Math.max(220, Math.round((viewH - 56) * 0.5)) : 0;
+      // Fixed bottom overlay height (export row ~52 + tab bar ~48 + panel)
+      const bottomH = isMobile ? Math.max(120, viewH - 56 - darkAreaH) : 0;
       // Card occupies 83% of dark area height — slightly larger default, visible dark border
       const PW = isMobile
         ? Math.round(darkAreaH * 0.83 * CANVAS_W / CANVAS_H)
@@ -819,7 +819,7 @@
             </div>
           )}
 
-          <header className="border-b border-stone-200 px-4 sm:px-12 py-2">
+          <header className="border-b border-stone-200 px-4 sm:px-12 py-2 flex-shrink-0">
             <div className="max-w-6xl mx-auto flex items-center gap-3">
               <img src="logo%20(1).png" alt="Color Diary" style={{height:'40px',width:'auto'}} />
               <span className="text-sm text-stone-600">Color Diary</span>
@@ -843,7 +843,7 @@
             </div>
           </header>
 
-          <main className="max-w-6xl mx-auto sm:px-12 sm:pt-14 pb-8 flex flex-col sm:flex-row sm:gap-12 items-start">
+          <main className={`max-w-6xl mx-auto sm:px-12 sm:pt-14 flex flex-col sm:flex-row sm:gap-12 items-start${!isMobile ? ' pb-8' : ''}`}>
 
             {/* always-present hidden file input so canvas tap always works */}
             <input ref={fileRef} type="file" accept="image/*,video/*" className="hidden"
@@ -853,7 +853,7 @@
 
               {/* Mobile: dark canvas zone — fixed height workspace, card floats centered */}
               {isMobile ? (
-                <div className="w-full bg-stone-900 flex items-center justify-center overflow-hidden"
+                <div className="w-full bg-stone-900 flex-shrink-0 flex items-center justify-center overflow-hidden"
                   style={{ height: darkAreaH }}>
                   <div ref={wrapRef}
                     className={`relative overflow-hidden select-none ${dropHover ? 'ring-1 ring-white/30' : ''}`}
@@ -910,125 +910,12 @@
                 </div>
               )}
 
-              {/* Mobile: export row between dark area and tab bar */}
-              {isMobile && (
-                <div className="px-5 py-3 flex items-center justify-between w-full border-b border-stone-100 bg-stone-50">
-                  <span className="text-xs text-stone-400" style={{ letterSpacing: '0.07em' }}>
-                    {sourceType === 'video' ? t.exportVideoNote : t.exportNote}
-                  </span>
-                  <button onClick={sourceType === 'video' ? exportVideo : exportPng} disabled={isExporting}
-                    className="px-5 py-2 bg-stone-800 text-stone-50 text-xs tracking-widest disabled:opacity-50 flex-shrink-0">
-                    {isExporting ? t.recording : sourceType === 'video' ? t.exportVideoBtn : t.exportBtn}
-                  </button>
-                </div>
-              )}
-
               {/* Desktop caption */}
               {!isMobile && (
                 <p className="text-xs text-stone-400" style={{ letterSpacing: '0.1em' }}>
                   {image ? t.captionImage : t.captionEmpty}
                 </p>
               )}
-
-              {/* Mobile: tab bar + active control panel */}
-              {isMobile && (() => {
-                const tabs = [
-                  { id: 'photo',    icon: '⊕',  label: t.photo    },
-                  { id: 'title',    icon: 'T',   label: t.title    },
-                  { id: 'date',     icon: '≡',   label: t.date     },
-                  { id: 'split',    icon: '/',   label: t.split    },
-                  { id: 'fontSize', icon: 'Aa',  label: t.fontSize },
-                  { id: 'color',    icon: '■',   label: t.bgColor  },
-                ];
-                return (
-                  <>
-                    <div className="flex w-full border-t border-stone-100 bg-stone-50">
-                      {tabs.map(tab => (
-                        <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-                          className={`flex-1 flex flex-col items-center py-3 gap-1 transition-colors ${activeTab === tab.id ? 'text-stone-800 border-b-2 border-stone-800' : 'text-stone-400'}`}>
-                          <span className="text-sm leading-none"
-                            style={tab.id === 'color' ? { color: bgColor } : {}}>
-                            {tab.icon}
-                          </span>
-                          <span style={{ fontSize: '9px', letterSpacing: '0.04em' }}>{tab.label}</span>
-                        </button>
-                      ))}
-                    </div>
-                    <div className="px-4 py-4 w-full border-b border-stone-100 overflow-y-auto" style={{height: panelH, touchAction:'pan-y'}}>
-                      {activeTab === 'photo' && (
-                        <button onClick={() => fileRef.current?.click()}
-                          className="w-full py-2.5 border border-stone-300 text-stone-600 text-xs tracking-widest">
-                          {image ? t.replace : t.upload}
-                        </button>
-                      )}
-                      {activeTab === 'title' && (
-                        <input type="text" value={title} onChange={e => setTitle(e.target.value)} autoFocus
-                          className="w-full border-b border-stone-200 focus:border-stone-600 outline-none py-2 text-stone-800 text-sm bg-transparent tracking-widest"
-                          style={{ fontFamily: "'Courier Prime','Courier New',monospace" }}
-                          placeholder={t.titlePh} />
-                      )}
-                      {activeTab === 'date' && (
-                        <div className="flex items-center gap-3">
-                          <input type="text" value={dateText} onChange={e => setDateText(e.target.value)} autoFocus
-                            className="flex-1 border-b border-stone-200 focus:border-stone-600 outline-none py-2 text-stone-600 text-xs bg-transparent tracking-widest"
-                            style={{ fontFamily: "'Courier Prime','Courier New',monospace" }}
-                            placeholder={t.datePh} />
-                          <button onClick={() => setDateText(AUTO_DATE)}
-                            className="text-xs text-stone-400 tracking-widest flex-shrink-0">{t.reset}</button>
-                        </div>
-                      )}
-                      {activeTab === 'split' && (
-                        <Section label={t.split} value={`${Math.round(split*100)} / ${Math.round((1-split)*100)}`}>
-                          <input type="range" min="0.2" max="0.75" step="0.01" value={split}
-                            onChange={e => setSplit(parseFloat(e.target.value))} className="mt-2" />
-                        </Section>
-                      )}
-                      {activeTab === 'fontSize' && (
-                        <Section label={t.fontSize} value={`${fontSize}px`}>
-                          <input type="range" min="12" max="72" step="1" value={fontSize}
-                            onChange={e => setFontSize(parseInt(e.target.value))} className="mt-2" />
-                        </Section>
-                      )}
-                      {activeTab === 'color' && (
-                        <div className="flex flex-col gap-3">
-                          <ColorPicker color={bgColor} onChange={setBgColor}
-                            onRandom={palette.length > 0 ? randomFromPalette : null}
-                            palette={palette}
-                            label={palette.length > 0 ? t.fromPhoto : t.autoExtracted}
-                            randomLabel={t.random} />
-                          <div className="pt-2 border-t border-stone-100">
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="text-xs text-stone-400 uppercase" style={{letterSpacing:'0.14em'}}>{t.grad}</span>
-                              <button onClick={() => setGradMode(v => !v)}
-                                className={`text-xs tracking-widest transition-colors ${gradMode ? 'text-stone-800' : 'text-stone-400'}`}>
-                                {gradMode ? t.gradOn : t.gradOff}
-                              </button>
-                            </div>
-                            {gradMode && (
-                              <ColorPicker color={bgColor2} onChange={setBgColor2}
-                                onRandom={palette.length > 0 ? () => setBgColor2(palette[Math.floor(Math.random()*palette.length)]) : null}
-                                palette={palette} randomLabel={t.random} />
-                            )}
-                          </div>
-                          <div className="pt-2 border-t border-stone-100">
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="text-xs text-stone-400 uppercase" style={{letterSpacing:'0.14em'}}>{t.grain}</span>
-                              <button onClick={() => setGrainEnabled(v => !v)}
-                                className={`text-xs tracking-widest transition-colors ${grainEnabled ? 'text-stone-800' : 'text-stone-400'}`}>
-                                {grainEnabled ? t.grainOn : t.grainOff}
-                              </button>
-                            </div>
-                            {grainEnabled && (
-                              <input type="range" min="0" max="100" step="1" value={grainIntensity}
-                                onChange={e => setGrainIntensity(parseInt(e.target.value))} />
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </>
-                );
-              })()}
             </div>
 
             {/* Desktop controls panel */}
@@ -1111,6 +998,119 @@
               </div>
             )}
           </main>
+
+          {/* Mobile: fixed bottom overlay — export row + tab bar + scrollable panel */}
+          {isMobile && (() => {
+            const tabs = [
+              { id: 'photo',    icon: '⊕',  label: t.photo    },
+              { id: 'title',    icon: 'T',   label: t.title    },
+              { id: 'date',     icon: '≡',   label: t.date     },
+              { id: 'split',    icon: '/',   label: t.split    },
+              { id: 'fontSize', icon: 'Aa',  label: t.fontSize },
+              { id: 'color',    icon: '■',   label: t.bgColor  },
+            ];
+            return (
+              <div style={{position:'fixed', bottom:0, left:0, right:0, height:bottomH, display:'flex', flexDirection:'column', background:'#fafaf9', zIndex:10, borderTop:'1px solid #e7e5e4'}}>
+                {/* Export row */}
+                <div className="px-5 py-3 flex items-center justify-between w-full border-b border-stone-100 bg-stone-50" style={{flexShrink:0}}>
+                  <span className="text-xs text-stone-400" style={{letterSpacing:'0.07em'}}>
+                    {sourceType === 'video' ? t.exportVideoNote : t.exportNote}
+                  </span>
+                  <button onClick={sourceType === 'video' ? exportVideo : exportPng} disabled={isExporting}
+                    className="px-5 py-2 bg-stone-800 text-stone-50 text-xs tracking-widest disabled:opacity-50" style={{flexShrink:0}}>
+                    {isExporting ? t.recording : sourceType === 'video' ? t.exportVideoBtn : t.exportBtn}
+                  </button>
+                </div>
+                {/* Tab bar */}
+                <div className="flex w-full border-t border-stone-100 bg-stone-50" style={{flexShrink:0}}>
+                  {tabs.map(tab => (
+                    <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+                      className={`flex-1 flex flex-col items-center py-3 gap-1 transition-colors ${activeTab === tab.id ? 'text-stone-800 border-b-2 border-stone-800' : 'text-stone-400'}`}>
+                      <span className="text-sm leading-none" style={tab.id === 'color' ? {color:bgColor} : {}}>
+                        {tab.icon}
+                      </span>
+                      <span style={{fontSize:'9px', letterSpacing:'0.04em'}}>{tab.label}</span>
+                    </button>
+                  ))}
+                </div>
+                {/* Scrollable panel — explicit flex:1 height, overflow-y:scroll for iOS */}
+                <div style={{flex:1, overflowY:'scroll', WebkitOverflowScrolling:'touch', overscrollBehavior:'contain'}}>
+                  <div className="px-4 py-4">
+                    {activeTab === 'photo' && (
+                      <button onClick={() => fileRef.current?.click()}
+                        className="w-full py-2.5 border border-stone-300 text-stone-600 text-xs tracking-widest">
+                        {image ? t.replace : t.upload}
+                      </button>
+                    )}
+                    {activeTab === 'title' && (
+                      <input type="text" value={title} onChange={e => setTitle(e.target.value)} autoFocus
+                        className="w-full border-b border-stone-200 focus:border-stone-600 outline-none py-2 text-stone-800 text-sm bg-transparent tracking-widest"
+                        style={{fontFamily:"'Courier Prime','Courier New',monospace"}}
+                        placeholder={t.titlePh} />
+                    )}
+                    {activeTab === 'date' && (
+                      <div className="flex items-center gap-3">
+                        <input type="text" value={dateText} onChange={e => setDateText(e.target.value)} autoFocus
+                          className="flex-1 border-b border-stone-200 focus:border-stone-600 outline-none py-2 text-stone-600 text-xs bg-transparent tracking-widest"
+                          style={{fontFamily:"'Courier Prime','Courier New',monospace"}}
+                          placeholder={t.datePh} />
+                        <button onClick={() => setDateText(AUTO_DATE)}
+                          className="text-xs text-stone-400 tracking-widest flex-shrink-0">{t.reset}</button>
+                      </div>
+                    )}
+                    {activeTab === 'split' && (
+                      <Section label={t.split} value={`${Math.round(split*100)} / ${Math.round((1-split)*100)}`}>
+                        <input type="range" min="0.2" max="0.75" step="0.01" value={split}
+                          onChange={e => setSplit(parseFloat(e.target.value))} className="mt-2" />
+                      </Section>
+                    )}
+                    {activeTab === 'fontSize' && (
+                      <Section label={t.fontSize} value={`${fontSize}px`}>
+                        <input type="range" min="12" max="72" step="1" value={fontSize}
+                          onChange={e => setFontSize(parseInt(e.target.value))} className="mt-2" />
+                      </Section>
+                    )}
+                    {activeTab === 'color' && (
+                      <div className="flex flex-col gap-3">
+                        <ColorPicker color={bgColor} onChange={setBgColor}
+                          onRandom={palette.length > 0 ? randomFromPalette : null}
+                          palette={palette}
+                          label={palette.length > 0 ? t.fromPhoto : t.autoExtracted}
+                          randomLabel={t.random} />
+                        <div className="pt-2 border-t border-stone-100">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs text-stone-400 uppercase" style={{letterSpacing:'0.14em'}}>{t.grad}</span>
+                            <button onClick={() => setGradMode(v => !v)}
+                              className={`text-xs tracking-widest transition-colors ${gradMode ? 'text-stone-800' : 'text-stone-400'}`}>
+                              {gradMode ? t.gradOn : t.gradOff}
+                            </button>
+                          </div>
+                          {gradMode && (
+                            <ColorPicker color={bgColor2} onChange={setBgColor2}
+                              onRandom={palette.length > 0 ? () => setBgColor2(palette[Math.floor(Math.random()*palette.length)]) : null}
+                              palette={palette} randomLabel={t.random} />
+                          )}
+                        </div>
+                        <div className="pt-2 border-t border-stone-100">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs text-stone-400 uppercase" style={{letterSpacing:'0.14em'}}>{t.grain}</span>
+                            <button onClick={() => setGrainEnabled(v => !v)}
+                              className={`text-xs tracking-widest transition-colors ${grainEnabled ? 'text-stone-800' : 'text-stone-400'}`}>
+                              {grainEnabled ? t.grainOn : t.grainOff}
+                            </button>
+                          </div>
+                          {grainEnabled && (
+                            <input type="range" min="0" max="100" step="1" value={grainIntensity}
+                              onChange={e => setGrainIntensity(parseInt(e.target.value))} />
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
 
         </div>
       );
