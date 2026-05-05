@@ -252,6 +252,7 @@
       const [gradMode, setGradMode]   = useState(false);
       const [bgColor2, setBgColor2]   = useState('#f0e6d3');
       const [textColor, setTextColor] = useState(null); // null = auto
+      const [inputFocused, setInputFocused] = useState(false);
 
       const canvasRef = useRef(null), fileRef = useRef(null), wrapRef = useRef(null);
       const ps = useRef({ on: false, sx: 0, sy: 0, spx: 0, spy: 0, moved: false, inImg: false, dragActive: false });
@@ -1031,7 +1032,7 @@
               { id: 'fontSize', icon: 'Aa',  label: t.fontSize },
               { id: 'color',    icon: '■',   label: t.bgColor  },
             ];
-            const keyboardOpen = keyboardH > 60;
+            const keyboardOpen = keyboardH > 60 || inputFocused;
             return (
               <div style={{position:'fixed', bottom:keyboardH, left:0, right:0, height:bottomH, display:'flex', flexDirection:'column', background:'#fafaf9', zIndex:10, borderTop:'1px solid #e7e5e4'}}>
                 {/* Export row — hidden when keyboard is open */}
@@ -1071,6 +1072,7 @@
                     )}
                     {activeTab === 'title' && (
                       <input type="text" value={title} onChange={e => setTitle(e.target.value)} autoFocus
+                        onFocus={() => setInputFocused(true)} onBlur={() => setInputFocused(false)}
                         className="w-full border-b border-stone-200 focus:border-stone-600 outline-none py-2 text-stone-800 text-sm bg-transparent tracking-widest"
                         style={{fontFamily:"'Courier Prime','Courier New',monospace"}}
                         placeholder={t.titlePh} />
@@ -1078,6 +1080,7 @@
                     {activeTab === 'date' && (
                       <div className="flex items-center gap-3">
                         <input type="text" value={dateText} onChange={e => setDateText(e.target.value)} autoFocus
+                          onFocus={() => setInputFocused(true)} onBlur={() => setInputFocused(false)}
                           className="flex-1 border-b border-stone-200 focus:border-stone-600 outline-none py-2 text-stone-600 text-xs bg-transparent tracking-widest"
                           style={{fontFamily:"'Courier Prime','Courier New',monospace"}}
                           placeholder={t.datePh} />
