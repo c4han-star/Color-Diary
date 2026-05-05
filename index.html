@@ -52,6 +52,7 @@
         fromPhoto: 'from photo', autoExtracted: 'auto-extracted', random: '↻ RANDOM',
         grain: 'Grain', grainOff: 'OFF', grainOn: 'ON',
         grad: 'Gradient', gradOff: 'OFF', gradOn: 'ON',
+        textColor: 'Text color', textColorAuto: 'AUTO', textColorManual: 'CUSTOM',
         exportBtn: 'EXPORT AS PNG', exportNote: 'exports at full resolution',
         exportVideoBtn: 'EXPORT AS VIDEO', exportVideoNote: 'records up to 5 sec · exports as .mp4',
         recording: 'RECORDING…',
@@ -85,6 +86,7 @@
         fromPhoto: '来自照片', autoExtracted: '自动提取', random: '↻ 随机',
         grain: '颗粒', grainOff: '关', grainOn: '开',
         grad: '渐变色', gradOff: '关', gradOn: '开',
+        textColor: '文字颜色', textColorAuto: '自动', textColorManual: '自定义',
         exportBtn: '导出 PNG', exportNote: '按原图分辨率导出',
         exportVideoBtn: '导出视频', exportVideoNote: '最长录制 5 秒 · 导出为 .mp4',
         recording: '录制中…',
@@ -249,6 +251,7 @@
       const [grainIntensity, setGrainIntensity] = useState(30);
       const [gradMode, setGradMode]   = useState(false);
       const [bgColor2, setBgColor2]   = useState('#f0e6d3');
+      const [textColor, setTextColor] = useState(null); // null = auto
 
       const canvasRef = useRef(null), fileRef = useRef(null), wrapRef = useRef(null);
       const ps = useRef({ on: false, sx: 0, sy: 0, spx: 0, spy: 0, moved: false, inImg: false, dragActive: false });
@@ -319,7 +322,7 @@
           ctx.fillText(t.uploadPrompt, CANVAS_W / 2, topH + botH / 2);
         }
 
-        const tc = getTextColor(bgColor);
+        const tc = textColor ?? getTextColor(bgColor);
         ctx.fillStyle = tc; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         ctx.font = `400 ${fontSize}px "Courier Prime","Courier New",monospace`;
         if ('letterSpacing' in ctx) ctx.letterSpacing = '6px';
@@ -340,7 +343,7 @@
           ctx.globalAlpha = 1;
           if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
         }
-      }, [image, bgColor, bgColor2, gradMode, title, split, fontSize, pan, dateText, lang, photoZoom, rotation, grainEnabled, grainIntensity]);
+      }, [image, bgColor, bgColor2, gradMode, title, split, fontSize, pan, dateText, lang, photoZoom, rotation, grainEnabled, grainIntensity, textColor]);
 
       useEffect(() => { draw(); }, [draw, fontsReady]);
 
@@ -655,7 +658,7 @@
           ctx.fillRect(0, topH, EW, botH);
         }
 
-        const tc = getTextColor(bgColor);
+        const tc = textColor ?? getTextColor(bgColor);
         const fs = Math.round(fontSize * scale);
         ctx.fillStyle = tc; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         ctx.font = `400 ${fs}px "Courier Prime","Courier New",monospace`;
@@ -698,7 +701,7 @@
             setTimeout(() => URL.revokeObjectURL(url), 1000);
           }
         }, 'image/png');
-      }, [title, isMobile, image, split, bgColor, bgColor2, gradMode, fontSize, photoZoom, rotation, pan, dateText, grainEnabled, grainIntensity]);
+      }, [title, isMobile, image, split, bgColor, bgColor2, gradMode, fontSize, photoZoom, rotation, pan, dateText, grainEnabled, grainIntensity, textColor]);
 
       return (
         <div className="bg-stone-50" style={{ fontFamily: "'Courier Prime','Courier New',monospace", ...(isMobile ? { height: viewH, overflow: 'hidden' } : { minHeight: '100vh' }) }}>
@@ -974,6 +977,19 @@
                     </div>
                   )}
                 </Section>
+                <Section label={t.textColor} value={textColor ? '' : t.textColorAuto}>
+                  <div className="flex items-center justify-between mt-1">
+                    <button onClick={() => setTextColor(v => v ? null : getTextColor(bgColor))}
+                      className={`text-xs tracking-widest transition-colors ${textColor ? 'text-stone-800' : 'text-stone-400 hover:text-stone-600'}`}>
+                      {textColor ? t.textColorManual : t.textColorAuto}
+                    </button>
+                  </div>
+                  {textColor && (
+                    <div className="mt-2">
+                      <ColorPicker color={textColor} onChange={setTextColor} />
+                    </div>
+                  )}
+                </Section>
                 <Section label={t.grain} value={grainEnabled ? `${grainIntensity}` : t.grainOff}>
                   <div className="flex items-center justify-between mt-1">
                     <button onClick={() => setGrainEnabled(v => !v)}
@@ -1102,6 +1118,18 @@
                           {grainEnabled && (
                             <input type="range" min="0" max="100" step="1" value={grainIntensity}
                               onChange={e => setGrainIntensity(parseInt(e.target.value))} />
+                          )}
+                        </div>
+                        <div className="pt-2 border-t border-stone-100">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs text-stone-400 uppercase" style={{letterSpacing:'0.14em'}}>{t.textColor}</span>
+                            <button onClick={() => setTextColor(v => v ? null : getTextColor(bgColor))}
+                              className={`text-xs tracking-widest transition-colors ${textColor ? 'text-stone-800' : 'text-stone-400'}`}>
+                              {textColor ? t.textColorManual : t.textColorAuto}
+                            </button>
+                          </div>
+                          {textColor && (
+                            <ColorPicker color={textColor} onChange={setTextColor} />
                           )}
                         </div>
                       </div>
